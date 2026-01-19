@@ -1,0 +1,16 @@
+[
+  {
+    "type": "manual",
+    "from": "C:/Users/asus tuf a15/Documents/Project/Work/ArcX/Project/Oceansan/input",
+    "to": "C:/Users/asus tuf a15/Documents/Project/Work/ArcX/Project/Oceansan/output",
+    "status": "started",
+    "timestamp": "2026-01-18T06:20:17.247Z"
+  },
+  {
+    "type": "manual",
+    "from": "C:/Users/asus tuf a15/Documents/Project/Work/ArcX/Project/Oceansan/input",
+    "to": "C:/Users/asus tuf a15/Documents/Project/Work/ArcX/Project/Oceansan/output",
+    "status": "completed",
+    "timestamp": "2026-01-18T06:20:17.372Z"
+  }
+]
