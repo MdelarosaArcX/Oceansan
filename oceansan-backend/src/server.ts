@@ -2,6 +2,9 @@ import express from "express";
 import cors from "cors";
 import { WebSocketServer } from "ws";
 import CopyService from "./services/copy.service";
+import scheduleRoutes from "./routes/schedule.routes";
+import "./config/mongo";
+
 
 const app = express();
 app.use(cors());
@@ -53,6 +56,12 @@ app.post("/copy/start", async (req, res) => {
 
   res.json({ status: "started" });
 });
+
+/* ---------------- Schedule CRUD ---------------- */
+
+app.use("/api/schedules", scheduleRoutes);
+
+/* ---------------- Server ---------------- */
 
 app.listen(PORT, () => {
   console.log(`API running on http://localhost:${PORT}`);

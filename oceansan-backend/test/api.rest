@@ -1,0 +1,62 @@
+### ================================
+### BASE CONFIG
+### ================================
+@host = http://localhost:3000
+@json = Content-Type: application/json
+
+
+### ================================
+### COPY SERVICE
+### ================================
+
+### Start Copy
+POST {{host}}/copy/start
+{{json}}
+
+{
+  "from": "C:/Users/tamid/OneDrive/Desktop/EVFSource",
+  "to": "C:/Users/tamid/OneDrive/Desktop/SCHTarget"
+}
+
+
+### ================================
+### SCHEDULE API
+### ================================
+
+### Create Schedule
+POST {{host}}/api/schedules
+{{json}}
+
+{
+  "src_path": "C:/Users/tamid/OneDrive/Desktop/EVFSource",
+  "dest_path": "C:/Users/tamid/OneDrive/Desktop/SCHTarget",
+  "sched": 24,
+  "type": "archive",
+  "time": "01:30",
+  "active": true
+}
+
+
+### Get All Schedules
+GET {{host}}/api/schedules
+
+
+### Get Schedule by ID
+### Replace {{scheduleId}} with actual ID
+@scheduleId = 65a7b9c2abcdef123456789
+
+GET {{host}}/api/schedules/{{scheduleId}}
+
+
+### Update Schedule
+PUT {{host}}/api/schedules/{{scheduleId}}
+{{json}}
+
+{
+  "time": "03:00",
+  "active": false
+}
+
+
+### Delete Schedule
+DELETE {{host}}/api/schedules/{{scheduleId}}
