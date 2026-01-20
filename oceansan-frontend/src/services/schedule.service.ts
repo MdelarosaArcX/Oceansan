@@ -36,3 +36,8 @@ export async function getSchedules() {
 export function updateSchedule(payload: UpdateSchedulePayload) {
   return api.put('/api/schedules/'+payload.id, payload);
 }
+
+// delete schedule
+export function deleteSchedule(id: string) {
+  return api.delete('/api/schedules/'+id);
+}

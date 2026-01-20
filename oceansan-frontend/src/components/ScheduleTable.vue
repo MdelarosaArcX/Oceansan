@@ -76,7 +76,7 @@
 </template>
 
 <script setup lang="ts">
-import { createSchedule, getSchedules, updateSchedule } from 'src/services/schedule.service';
+import { createSchedule, deleteSchedule, getSchedules, updateSchedule } from 'src/services/schedule.service';
 import type { QTableColumn } from 'quasar';
 import { onMounted, ref } from 'vue';
 import ScheduleDialog from './ScheduleDialog.vue';
@@ -208,7 +208,13 @@ function runJob(row: JobRow) {
   console.log('Run job:', row);
 }
 
-function deleteJob(row: JobRow) {
+async function deleteJob(row: JobRow) {
+  if (row.id) {
+    
+    await deleteSchedule(row.id);
+    await fetchSchedules();
+    return;
+  }
   console.log('Delete job:', row);
 }
 
