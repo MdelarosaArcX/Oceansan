@@ -1,4 +1,4 @@
-import fs from "fs";
+import fs from "fs-extra";
 import path from "path";
 import fse from "fs-extra";
 import { EventEmitter } from "events";
@@ -10,7 +10,7 @@ import {
 } from "../types/copy.types";
 
 export default class CopyService extends EventEmitter {
-  async copyFolder(from: string, to: string): Promise<void> {
+  async _archive(from: string, to: string): Promise<void> {
     const files = walkDir(from);
     const totalSize = files.reduce((s, f) => s + f.size, 0);
 
@@ -61,4 +61,49 @@ export default class CopyService extends EventEmitter {
 
     this.emit("complete", completePayload);
   }
+
+  async _sync(src: string, dest: string): Promise<void> {
+  this.emit("start", { type: "sync" });
+
+  // Delete destination first (mirror)
+  await fs.remove(dest);
+  await fs.ensureDir(dest);
+
+  // Walk all files in src
+  const files = walkDir(src);
+  const totalSize = files.reduce((s, f) => s + f.size, 0);
+  let copiedSize = 0;
+
+  for (const file of files) {
+    const relative = path.relative(src, file.path);
+    const destination = path.join(dest, relative);
+
+    await fs.ensureDir(path.dirname(destination));
+
+    await new Promise<void>((resolve, reject) => {
+      const read = fs.createReadStream(file.path);
+      const write = fs.createWriteStream(destination);
+
+      read.on("data", (chunk: Buffer) => {
+        copiedSize += chunk.length;
+
+        this.emit("progress", {
+          copiedSize,
+          totalSize,
+          percent: Math.floor((copiedSize / totalSize) * 100),
+          currentFile: relative
+        });
+      });
+
+      read.on("error", reject);
+      write.on("error", reject);
+      write.on("finish", resolve);
+
+      read.pipe(write);
+    });
+  }
+
+  this.emit("complete", { copiedSize, totalSize });
+}
+
 }

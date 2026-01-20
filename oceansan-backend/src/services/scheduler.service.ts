@@ -1,48 +1,130 @@
-import cron, { ScheduledTask } from "node-cron";
+import cron from "node-cron";
+import fs from "fs-extra";
+import path from "path";
+import Schedule, { ISchedule } from "../models/Schedule";
 import CopyService from "./copy.service";
-import { writeLog } from "./logger.service";
-import { CopyJob } from "../types/scheduler.types";
 
-export default class SchedulerService {
-  private tasks = new Map<string, ScheduledTask>();
+type Broadcaster = (data: unknown) => void;
 
-  start(job: CopyJob) {
-    if (this.tasks.has(job.id)) return;
+class SchedulerService {
+  private broadcaster?: Broadcaster;
+  private running = new Set<string>();
 
-    const task = cron.schedule(job.cron, async () => {
-      const copier = new CopyService();
+  setBroadcaster(fn: Broadcaster) {
+    this.broadcaster = fn;
+  }
 
-      writeLog({
-        type: "scheduled",
-        jobId: job.id,
-        status: "started"
+  start() {
+    cron.schedule("* * * * *", async () => {
+      const now = new Date();
+      const hhmm = now.toTimeString().slice(0, 5); // HH:mm
+      const today = now.getDay();
+
+      const schedules = await Schedule.find({
+        active: true,
+        time: hhmm,
+        days: today
       });
 
-      copier.on("complete", () => {
-        writeLog({
-          type: "scheduled",
-          jobId: job.id,
-          status: "completed"
-        });
-      });
-
-      try {
-        await copier.copyFolder(job.from, job.to);
-      } catch (err) {
-        writeLog({
-          type: "scheduled",
-          jobId: job.id,
-          status: "failed",
-          error: (err as Error).message
-        });
+      for (const schedule of schedules) {
+        if (this.running.has(schedule._id.toString())) continue;
+        this.runSchedule(schedule);
       }
     });
 
-    this.tasks.set(job.id, task);
+    console.log("Scheduler running (day + time based)");
   }
 
-  stop(jobId: string) {
-    this.tasks.get(jobId)?.stop();
-    this.tasks.delete(jobId);
+  private async runSchedule(schedule: ISchedule) {
+    this.running.add(schedule._id.toString());
+
+    const copier = new CopyService();
+
+    //  Prepare log file
+    const logsDir = path.join(process.cwd(), "logs");
+    await fs.ensureDir(logsDir);
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const logFile = path.join(
+      logsDir,
+      `log_${schedule._id}_${timestamp}.txt`
+    );
+
+    const appendLog = async (line: string) => {
+      await fs.appendFile(logFile, line + "\n");
+    };
+
+    await appendLog(`Schedule ${schedule.type.toUpperCase()} started`);
+    await appendLog(`Source: ${schedule.src_path}`);
+    await appendLog(`Destination: ${schedule.dest_path}`);
+    await appendLog(`Start Time: ${new Date().toISOString()}`);
+    await appendLog("------ FILES ------");
+
+    //  Broadcast start
+    this.broadcaster?.({
+      type: "schedule-start",
+      scheduleId: schedule._id.toString(),
+      mode: schedule.type
+    });
+
+    //  Log progress
+    copier.on("progress", async (progress) => {
+      this.broadcaster?.({
+        type: "schedule-progress",
+        scheduleId: schedule._id.toString(),
+        payload: progress
+      });
+
+      const line = `[${progress.percent}%] ${progress.currentFile}`;
+      await appendLog(line);
+    });
+
+    //  Complete handler
+    copier.on("complete", async () => {
+      // update last_archived only
+      await Schedule.updateOne(
+        { _id: schedule._id.toString() },
+        { $set: schedule.type === "archive" ? { last_archived: new Date() } : { last_sync: new Date() } }
+      );
+
+      this.running.delete(schedule._id.toString());
+
+      this.broadcaster?.({
+        type: "schedule-complete",
+        scheduleId: schedule._id.toString()
+      });
+
+      await appendLog("Schedule complete");
+      await appendLog(`End Time: ${new Date().toISOString()}`);
+      await appendLog("------ END ------");
+      console.log(`[${schedule.type.toUpperCase()}] Completed. Log: ${logFile}`);
+    });
+
+    //  Error handler
+    copier.on("error", async (err: Error) => {
+      this.running.delete(schedule._id.toString());
+
+      this.broadcaster?.({
+        type: "schedule-error",
+        scheduleId: schedule._id,
+        message: err.message
+      });
+
+      await appendLog(`ERROR: ${err.message}`);
+      console.error(`[${schedule.type.toUpperCase()}] Error: ${err.message}`);
+    });
+
+    //  Execute proper method
+    try {
+      if (schedule.type === "archive") {
+        await copier._archive(schedule.src_path, schedule.dest_path);
+      } else if (schedule.type === "sync") {
+        await copier._sync(schedule.src_path, schedule.dest_path);
+      }
+    } catch (err) {
+      copier.emit("error", err);
+    }
   }
 }
+
+export default new SchedulerService();
