@@ -1,10 +1,11 @@
+import "./config/mongo";
+
 import express from "express";
 import cors from "cors";
 import { WebSocketServer } from "ws";
 import CopyService from "./services/copy.service";
 import scheduleRoutes from "./routes/schedule.routes";
-import "./config/mongo";
-
+import schedulerService from "./services/scheduler.service";
 
 const app = express();
 app.use(cors());
@@ -27,41 +28,42 @@ function broadcast(data: unknown) {
 
 console.log("WebSocket running on ws://localhost:3001");
 
-/* ---------------- REST API ---------------- */
+/* ---------------- Scheduler ---------------- */
+
+schedulerService.setBroadcaster(broadcast); // optional but useful
+schedulerService.start();                   //  REQUIRED
+
+/* ---------------- REST APIs ---------------- */
 
 app.post("/copy/start", async (req, res) => {
-  const { from, to } = req.body;
-
+  const { from, to , type } = req.body;
   if (!from || !to) {
     return res.status(400).json({ error: "Missing from/to paths" });
   }
 
   const copier = new CopyService();
+  copier.on("progress", p => broadcast({ type: "progress", payload: p }));
+  copier.on("complete", () => broadcast({ type: "complete" }));
+  copier.on("error", (err: Error) =>
+    broadcast({ type: "error", message: err.message })
+  );
 
-  copier.on("progress", p => {
-    broadcast({ type: "progress", payload: p });
-  });
+  try {
+    if (type === "sync") {
+      await copier._sync(from, to);
+    } else {
+      await copier._archive(from, to);
+    }
 
-  copier.on("complete", () => {
-    broadcast({ type: "complete" });
-  });
-
-  copier.on("start", s => {
-    broadcast({ type: "start", payload: s });
-  });
-
-  copier.copyFolder(from, to).catch(err => {
-    broadcast({ type: "error", message: err.message });
-  });
-
-  res.json({ status: "started" });
+    res.json({ status: "started" });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
-
-/* ---------------- Schedule CRUD ---------------- */
 
 app.use("/api/schedules", scheduleRoutes);
 
-/* ---------------- Server ---------------- */
+/* ---------------- Start Server ---------------- */
 
 app.listen(PORT, () => {
   console.log(`API running on http://localhost:${PORT}`);
