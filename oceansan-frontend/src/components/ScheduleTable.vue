@@ -8,7 +8,7 @@
 
       <q-btn
         unelevated
-        :color="$q.dark.isActive ? 'secondary' : 'negative'"
+        :color="$q.dark.isActive ? 'base-dark-3' : 'base-dark-2'"
         icon="add_circle"
         rounded
         label="Create Schedule"
@@ -27,6 +27,24 @@
       separator="horizontal"
       :rows-per-page-options="[5, 10, 20]"
     >
+      <template #body-cell-from="props">
+        <q-td :props="props">
+          <span class="ellipsis">
+            {{ shortenPath(props.value) }}
+            <q-tooltip>{{ props.value }}</q-tooltip>
+          </span>
+        </q-td>
+      </template>
+
+      <template #body-cell-to="props">
+        <q-td :props="props">
+          <span class="ellipsis">
+            {{ shortenPath(props.value) }}
+            <q-tooltip>{{ props.value }}</q-tooltip>
+          </span>
+        </q-td>
+      </template>
+
       <!-- Status column -->
       <template #body-cell-status="props">
         <q-td :props="props">
@@ -43,7 +61,7 @@
             <q-tooltip>Run</q-tooltip>
           </q-btn>
 
-          <q-btn dense flat icon="edit" color="secondary" @click="openEdit(props.row)">
+          <q-btn dense flat icon="edit" color="primary" @click="openEdit(props.row)">
             <q-tooltip>Edit</q-tooltip>
           </q-btn>
 
@@ -58,19 +76,24 @@
 </template>
 
 <script setup lang="ts">
+import { createSchedule, getSchedules, updateSchedule } from 'src/services/schedule.service';
 import type { QTableColumn } from 'quasar';
-import { ref } from 'vue';
-// import ScheduleDialog from './ScheduleDialog.vue';
-// import type { SchedulePayload } from './ScheduleDialog.vue';
+import { onMounted, ref } from 'vue';
 import ScheduleDialog from './ScheduleDialog.vue';
-import type { SchedulePayload } from 'src/types/Schedule';
+import type { BackendSchedule, SchedulePayload } from 'src/types/Schedule';
+import { DAY_LABELS } from 'src/constants/days';
+// const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+import { formatTime12h } from 'src/utils/formatters';
 
 interface JobRow {
-  id: number;
+  id: string;
   name: string;
   from: string;
   to: string;
-  lastArchive: string;
+  last_archived: string;
+  sched: number[];
+  time: string;
+  type: 'sync' | 'archive';
   status: 'Active' | 'In-active';
 }
 
@@ -79,13 +102,60 @@ const selectedSchedule = ref<SchedulePayload | null>(null);
 
 const columns: QTableColumn<JobRow>[] = [
   { name: 'name', label: 'Name', field: 'name', align: 'left' },
-  { name: 'from', label: 'From', field: 'from', align: 'left' },
-  { name: 'to', label: 'To', field: 'to', align: 'left' },
   {
-    name: 'lastArchive',
-    label: 'Last Archive',
-    field: 'lastArchive',
+    name: 'from',
+    label: 'From',
+    field: 'from',
     align: 'left',
+    classes: 'ellipsis',
+    style: 'max-width: 260px',
+  },
+  {
+    name: 'to',
+    label: 'To',
+    field: 'to',
+    align: 'left',
+    classes: 'ellipsis',
+    style: 'max-width: 260px',
+  },
+  // ✅ NEW SCHEDULE COLUMN
+  {
+    name: 'sched',
+    label: 'Days',
+    field: 'sched',
+    align: 'left',
+    format: (val: number[]) => {
+      if (!val?.length) return '-';
+      return val
+        .sort()
+        .map((d) => DAY_LABELS[d])
+        .join(', ');
+    },
+  },
+  {
+    name: 'time',
+    label: 'Time',
+    field: 'time',
+    align: 'left',
+    format: (val) => formatTime12h(val),
+  },
+  {
+    name: 'last_archived',
+    label: 'Last Archive',
+    field: 'last_archived',
+    align: 'left',
+    format: (val: string | null) => {
+      if (!val) return '-';
+
+      return new Intl.DateTimeFormat('en-US', {
+        month: 'short', // Jan
+        day: 'numeric', // 2
+        year: 'numeric', // 2026
+        hour: 'numeric', // 2
+        minute: '2-digit',
+        hour12: true,
+      }).format(new Date(val));
+    },
   },
   {
     name: 'status',
@@ -101,31 +171,34 @@ const columns: QTableColumn<JobRow>[] = [
   },
 ];
 
-const rows: JobRow[] = [
-  {
-    id: 1,
-    name: 'Daily Backup',
-    from: 'D:/Data',
-    to: 'E:/Backup',
-    lastArchive: '2026-01-17 22:10',
-    status: 'Active',
-  },
-  {
-    id: 2,
-    name: 'Media Sync',
-    from: 'D:/Media',
-    to: 'NAS/Media',
-    lastArchive: '—',
-    status: 'In-active',
-  },
-];
+const rows = ref<JobRow[]>([]);
+
+async function fetchSchedules() {
+  try {
+    const data: BackendSchedule[] = await getSchedules();
+
+    rows.value = data.map((s) => ({
+      id: s._id,
+      name: s.sched_name,
+      from: s.src_path,
+      to: s.dest_path,
+      sched: s.days ?? [],
+      last_archived: s.last_archived ?? '',
+      type: s.type,
+      status: s.active ? 'Active' : 'In-active',
+      time: s.time,
+    }));
+  } catch (err) {
+    console.error('Failed to fetch schedules', err);
+  }
+}
 
 function statusColor(status: JobRow['status']) {
   switch (status) {
     case 'Active':
       return 'primary';
     case 'In-active':
-      return 'negative';
+      return 'base-dark-2';
     default:
       return 'grey';
   }
@@ -148,19 +221,61 @@ function openEdit(row: JobRow) {
   selectedSchedule.value = {
     id: row.id,
     name: row.name,
-    from: row.from,
-    to: row.to,
-    sched: [],
-    time: '00:00',
+    src_path: row.from,
+    dest_path: row.to,
+    sched: row.sched,
+    type: row.type,
+    time: row.time,
+    status: row.status === 'Active' ? true : false,
   };
   dialog.value = true;
 }
 
-function saveSchedule(payload: SchedulePayload) {
+// After creating a schedule, refresh the table
+async function saveSchedule(payload: SchedulePayload) {
   if (payload.id) {
+    
+    await updateSchedule({
+      id: payload.id,
+      sched_name: payload.name,
+      src_path: payload.src_path,
+      dest_path: payload.dest_path,
+      days: payload.sched.map(Number),
+      type: payload.type,
+      time: payload.time,
+      active: payload.status,
+    });
     console.log('Update schedule', payload);
-  } else {
-    console.log('Create schedule', payload);
+    await fetchSchedules();
+    return;
+  }
+
+  try {
+    await createSchedule({
+      sched_name: payload.name,
+      src_path: payload.src_path,
+      dest_path: payload.dest_path,
+      days: payload.sched.map(Number),
+      type: payload.type,
+      time: payload.time,
+      active: true,
+    });
+
+    console.log('Schedule created');
+
+    // Refresh table
+    await fetchSchedules();
+  } catch (err) {
+    console.error('Failed to create schedule', err);
   }
 }
+
+function shortenPath(path: string) {
+  if (!path) return '—'
+  return path.split(/[\\/]/).slice(-4).join('/')
+}
+
+
+// Fetch schedules when the table mounts
+onMounted(fetchSchedules);
 </script>

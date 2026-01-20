@@ -1,6 +1,6 @@
 <template>
   <q-layout view="lHh Lpr lff">
-    <q-header class="q-pl-md" style="border-bottom: 1px solid #505050;" :class="$q.dark.isActive ? 'bg-secondary' : 'bg-positive text-negative'">
+    <q-header class="q-pl-md" style="border-bottom: 1px solid #505050;" :class="$q.dark.isActive ? 'bg-base-dark-3' : 'bg-base-light-1 text-base-dark-2'">
       <q-toolbar>
         <q-toolbar-title>{{ activeMenu }}</q-toolbar-title>
 
@@ -21,7 +21,7 @@
       show-if-above
       :width="200"
       :breakpoint="500"
-      :class="$q.dark.isActive ? '' : 'bg-accent text-negative'"
+      :class="$q.dark.isActive ? '' : 'bg-base-light-2 text-base-dark-2'"
     >
       <q-scroll-area style="height: calc(100% - 70px); margin-top: 70px">
         <q-list padding>
@@ -31,10 +31,10 @@
               :class="[
                 menuItem.label === activeMenu
                   ? Dark.isActive
-                    ? 'bg-secondary text-accent'
-                    : 'bg-positive text-negative'
+                    ? 'bg-base-dark-3 text-base-light-2'
+                    : 'bg-base-light-1 text-base-dark-2'
                   : Dark.isActive
-                    ? 'bg-dark-page text-accent'
+                    ? 'bg-dark-page text-base-light-2'
                     : 'bg-light text-dark',
               ]"
               v-ripple
@@ -53,7 +53,7 @@
       </q-scroll-area>
       <q-img class="absolute-top" style="height: 70px">
         <div class="absolute-bottom bg-transparent">
-          <div class="text-weight-bold" :class="$q.dark.isActive ? '' : 'text-negative'">
+          <div class="text-weight-bold" :class="$q.dark.isActive ? '' : 'text-base-dark-2'">
             OCEANSAN
           </div>
         </div>

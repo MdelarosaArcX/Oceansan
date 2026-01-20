@@ -13,7 +13,8 @@ export default defineConfig((/* ctx */) => {
     // https://v2.quasar.dev/quasar-cli-vite/boot-files
     boot: [
       "pinia",
-      "dark"
+      "dark",
+      "axios"
     ],
 
     // https://v2.quasar.dev/quasar-cli-vite/quasar-config-file#css

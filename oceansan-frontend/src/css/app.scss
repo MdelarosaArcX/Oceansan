@@ -2,3 +2,52 @@
 :root {
   --page-bg: #f8fafc;
 }
+
+.bg-base-light-1 {
+  background-color: $base-light-1;
+}
+
+.bg-base-light-2 {
+  background-color: $base-light-2;
+}
+
+.bg-base-light-3 {
+  background-color: $base-light-3;
+}
+
+.text-base-light-1 {
+  color: $base-light-1;
+}
+
+.text-base-light-2 {
+  color: $base-light-2;
+}
+
+.text-base-light-3 {
+  color: $base-light-3;
+}
+
+// dark
+.bg-base-dark-1 {
+  background-color: $base-dark-1;
+}
+
+.bg-base-dark-2 {
+  background-color: $base-dark-2;
+}
+
+.bg-base-dark-3 {
+  background-color: $base-dark-3;
+}
+
+.text-base-dark-1 {
+  color: $base-dark-1;
+}
+
+.text-base-dark-2 {
+  color: $base-dark-2;
+}
+
+.text-base-dark-3 {
+  color: $base-dark-3;
+}
