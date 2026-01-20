@@ -48,9 +48,20 @@
       <!-- Status column -->
       <template #body-cell-status="props">
         <q-td :props="props">
-          <q-chip dense :color="statusColor(props.value)" text-color="white">
+          <q-chip v-if="!store.running" dense :color="statusColor(props.value)" text-color="white">
             {{ props.value }}
           </q-chip>
+          <div v-if="store.running">
+          <q-linear-progress
+            :value="store.percent / 100"
+            rounded
+            stripe
+            animated
+            size="18px"
+            color="primary"
+          /><br>
+          {{ store.percent }}% — {{ store.currentFile }}
+          </div>
         </q-td>
       </template>
 
@@ -76,14 +87,19 @@
 </template>
 
 <script setup lang="ts">
-import { createSchedule, deleteSchedule, getSchedules, updateSchedule } from 'src/services/schedule.service';
+import {
+  createSchedule,
+  deleteSchedule,
+  getSchedules,
+  updateSchedule,
+} from 'src/services/schedule.service';
 import type { QTableColumn } from 'quasar';
 import { onMounted, ref } from 'vue';
 import ScheduleDialog from './ScheduleDialog.vue';
 import type { BackendSchedule, SchedulePayload } from 'src/types/Schedule';
 import { DAY_LABELS } from 'src/constants/days';
-// const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 import { formatTime12h } from 'src/utils/formatters';
+import { useCopyStore } from 'stores/copy.store';
 
 interface JobRow {
   id: string;
@@ -204,13 +220,8 @@ function statusColor(status: JobRow['status']) {
   }
 }
 
-function runJob(row: JobRow) {
-  console.log('Run job:', row);
-}
-
 async function deleteJob(row: JobRow) {
   if (row.id) {
-    
     await deleteSchedule(row.id);
     await fetchSchedules();
     return;
@@ -240,7 +251,6 @@ function openEdit(row: JobRow) {
 // After creating a schedule, refresh the table
 async function saveSchedule(payload: SchedulePayload) {
   if (payload.id) {
-    
     await updateSchedule({
       id: payload.id,
       sched_name: payload.name,
@@ -277,10 +287,15 @@ async function saveSchedule(payload: SchedulePayload) {
 }
 
 function shortenPath(path: string) {
-  if (!path) return '—'
-  return path.split(/[\\/]/).slice(-4).join('/')
+  if (!path) return '—';
+  return path.split(/[\\/]/).slice(-4).join('/');
 }
 
+const store = useCopyStore();
+
+async function runJob(row: JobRow) {
+  await store.startCopy(row.from, row.to);
+}
 
 // Fetch schedules when the table mounts
 onMounted(fetchSchedules);

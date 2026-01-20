@@ -21,7 +21,7 @@
 
       <!-- Form (Scrollable) -->
       <q-card-section class="q-pt-md q-pa-none">
-        <q-scroll-area  :style="{ height: $q.screen.lt.md ? '60vh' : '70vh' }">
+        <q-scroll-area :style="{ height: $q.screen.lt.md ? '60vh' : '70vh' }">
           <div class="q-pa-md">
             <q-form id="schedule-form" @submit="submit" @reset="reset" class="q-gutter-lg">
               <!-- Status -->
@@ -140,7 +140,7 @@
                 </div>
 
                 <!-- Time -->
-                 {{ form.time }}
+                {{ form.time }}
                 <q-input
                   v-model="form.time"
                   outlined
@@ -174,9 +174,12 @@
       <!-- Footer (fixed) -->
       <q-card-section class="q-pa-sm">
         <div class="row justify-end q-gutter-sm">
-          <q-btn flat label="Reset" type="reset" form="schedule-form" />
+          <q-btn rounded flat label="Reset" type="reset" form="schedule-form" />
 
           <q-btn
+            no-caps
+            rounded
+            unelevated
             :label="isEdit ? 'Update Schedule' : 'Create Schedule'"
             color="primary"
             type="submit"
