@@ -39,6 +39,7 @@ class SchedulerService {
     this.running.add(schedule._id.toString());
 
     const copier = new CopyService();
+     let lastPercent = 0;
 
     //  Prepare log file
     const logsDir = path.join(process.cwd(), "logs");
@@ -47,7 +48,7 @@ class SchedulerService {
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     const logFile = path.join(
       logsDir,
-      `log_${schedule._id}_${timestamp}.txt`
+      `log_${schedule.type}_${schedule.sched_name}_${timestamp}.txt`
     );
 
     const appendLog = async (line: string) => {
@@ -68,16 +69,31 @@ class SchedulerService {
     });
 
     //  Log progress
-    copier.on("progress", async (progress) => {
+    copier.on("progress", (progress) => {
+      lastPercent = progress.percent;
+
       this.broadcaster?.({
         type: "schedule-progress",
         scheduleId: schedule._id.toString(),
         payload: progress
       });
-
-      const line = `[${progress.percent}%] ${progress.currentFile}`;
-      await appendLog(line);
     });
+
+    // File success
+    copier.on("file-success", async ({ file, copiedSize, totalSize }) => {
+      const percent = Math.floor((copiedSize / totalSize) * 100);
+      lastPercent = percent;
+
+      await appendLog(`[${percent}%] copied: ${file}`);
+    });
+
+    // File error
+    copier.on("file-error", async ({ file, error }) => {
+      await appendLog(
+        `[${lastPercent}%] error: ${file} - ${error}`
+      );
+    });
+
 
     //  Complete handler
     copier.on("complete", async () => {
@@ -115,6 +131,7 @@ class SchedulerService {
     });
 
     //  Execute proper method
+
     try {
       if (schedule.type === "archive") {
         await copier._archive(schedule.src_path, schedule.dest_path);
