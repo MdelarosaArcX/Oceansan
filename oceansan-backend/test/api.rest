@@ -28,6 +28,7 @@ POST {{host}}/api/schedules
 {{json}}
 
 {
+    "sched_name":"test",
   "src_path": "C:/Users/tamid/OneDrive/Desktop/EVFSource",
   "dest_path": "C:/Users/tamid/OneDrive/Desktop/SCHTarget",
   "sched": 24,
