@@ -1,4 +1,4 @@
-// models/ScheduleExecution.ts
+// models/ScheduleLogs.ts
 import { Schema, model, Types } from "mongoose";
 
 export type FileStatus =
@@ -7,14 +7,14 @@ export type FileStatus =
   | "deleted"
   | "error";
 
-export interface IExecutionFile {
+export interface ILogsFile {
   path: string;
   size: number;
   status: FileStatus;
   error?: string;
 }
 
-export interface IScheduleExecution {
+export interface IScheduleLogs {
   scheduleId: Types.ObjectId;
   type: "archive" | "sync";
   source: string;
@@ -26,10 +26,10 @@ export interface IScheduleExecution {
   totalFiles: number;
   totalSize: number;
 
-  files: IExecutionFile[];
+  files: ILogsFile[];
 }
 
-const ExecutionFileSchema = new Schema<IExecutionFile>({
+const LogsFileSchema = new Schema<ILogsFile>({
   path: String,
   size: Number,
   status: {
@@ -39,7 +39,7 @@ const ExecutionFileSchema = new Schema<IExecutionFile>({
   error: String
 });
 
-const ScheduleExecutionSchema = new Schema<IScheduleExecution>({
+const ScheduleLogsSchema = new Schema<IScheduleLogs>({
   scheduleId: { type: Schema.Types.ObjectId, ref: "Schedule" },
   type: String,
   source: String,
@@ -51,10 +51,10 @@ const ScheduleExecutionSchema = new Schema<IScheduleExecution>({
   totalFiles: Number,
   totalSize: Number,
 
-  files: [ExecutionFileSchema]
+  files: [LogsFileSchema]
 });
 
-export default model<IScheduleExecution>(
-  "ScheduleExecution",
-  ScheduleExecutionSchema
+export default model<IScheduleLogs>(
+  "ScheduleLogs",
+  ScheduleLogsSchema
 );

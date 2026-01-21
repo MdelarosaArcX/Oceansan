@@ -32,8 +32,8 @@ POST {{host}}/api/schedules
   "src_path": "C:/Users/tamid/OneDrive/Desktop/EVFSource",
   "dest_path": "C:/Users/tamid/OneDrive/Desktop/SCHTarget",
   "days": [3],
-  "type": "sync",
-  "time": "10:26",
+  "type": "archive",
+  "time": "17:07",
   "active": true
 }
 
@@ -61,3 +61,6 @@ PUT {{host}}/api/schedules/{{scheduleId}}
 
 ### Delete Schedule
 DELETE {{host}}/api/schedules/{{scheduleId}}
+
+### GET Schedule Logs
+GET {{host}}/api/schedulesLogs?page=1&rowsPerPage=3&sortBy=createdAt&descending=true
