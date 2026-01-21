@@ -1,10 +1,21 @@
+import "./config/mongo";
+
 import express from "express";
 import cors from "cors";
 import { WebSocketServer } from "ws";
 import CopyService from "./services/copy.service";
+import scheduleRoutes from "./routes/schedule.routes";
+import schedulerService from "./services/scheduler.service";
 
 const app = express();
-app.use(cors());
+app.use(
+  cors({
+    origin: ["http://localhost:9000", "http://localhost:5173"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+  }),
+);
 app.use(express.json());
 
 const PORT = 3000;
@@ -15,7 +26,7 @@ const wss = new WebSocketServer({ port: 3001 });
 
 function broadcast(data: unknown) {
   const payload = JSON.stringify(data);
-  wss.clients.forEach(client => {
+  wss.clients.forEach((client) => {
     if (client.readyState === 1) {
       client.send(payload);
     }
@@ -24,35 +35,42 @@ function broadcast(data: unknown) {
 
 console.log("WebSocket running on ws://localhost:3001");
 
-/* ---------------- REST API ---------------- */
+/* ---------------- Scheduler ---------------- */
+
+schedulerService.setBroadcaster(broadcast); // optional but useful
+schedulerService.start(); //  REQUIRED
+
+/* ---------------- REST APIs ---------------- */
 
 app.post("/copy/start", async (req, res) => {
-  const { from, to } = req.body;
-
+  const { from, to, type } = req.body;
   if (!from || !to) {
     return res.status(400).json({ error: "Missing from/to paths" });
   }
 
   const copier = new CopyService();
+  copier.on("progress", (p) => broadcast({ type: "progress", payload: p }));
+  copier.on("complete", () => broadcast({ type: "complete" }));
+  copier.on("error", (err: Error) =>
+    broadcast({ type: "error", message: err.message }),
+  );
 
-  copier.on("progress", p => {
-    broadcast({ type: "progress", payload: p });
-  });
+  try {
+    if (type === "sync") {
+      await copier._sync(from, to);
+    } else {
+      await copier._archive(from, to);
+    }
 
-  copier.on("complete", () => {
-    broadcast({ type: "complete" });
-  });
-
-  copier.on("start", s => {
-    broadcast({ type: "start", payload: s });
-  });
-
-  copier.copyFolder(from, to).catch(err => {
-    broadcast({ type: "error", message: err.message });
-  });
-
-  res.json({ status: "started" });
+    res.json({ status: "started" });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
+
+app.use("/api/schedules", scheduleRoutes);
+
+/* ---------------- Start Server ---------------- */
 
 app.listen(PORT, () => {
   console.log(`API running on http://localhost:${PORT}`);
