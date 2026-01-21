@@ -2,7 +2,7 @@ import cron from "node-cron";
 import fs from "fs-extra";
 import path from "path";
 import Schedule, { ISchedule } from "../models/Schedule";
-import ScheduleExecution from "../models/ScheduleExecution";
+import ScheduleLogs from "../models/ScheduleLogs";
 import CopyService from "./copy.service";
 
 type Broadcaster = (data: unknown) => void;
@@ -46,7 +46,7 @@ class SchedulerService {
     let lastPercent = 0;
 
     /* -------------------- Execution Record -------------------- */
-    const execution = await ScheduleExecution.create({
+    const execution = await ScheduleLogs.create({
       scheduleId: schedule._id,
       type: schedule.type,
       source: schedule.src_path,

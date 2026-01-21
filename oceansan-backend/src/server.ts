@@ -5,6 +5,7 @@ import cors from "cors";
 import { WebSocketServer } from "ws";
 import CopyService from "./services/copy.service";
 import scheduleRoutes from "./routes/schedule.routes";
+import scheduleLogsRoutes from "./routes/scheduleLogs.routes";
 import schedulerService from "./services/scheduler.service";
 
 const app = express();
@@ -69,6 +70,7 @@ app.post("/copy/start", async (req, res) => {
 });
 
 app.use("/api/schedules", scheduleRoutes);
+app.use("/api/schedulesLogs", scheduleLogsRoutes);
 
 /* ---------------- Start Server ---------------- */
 
