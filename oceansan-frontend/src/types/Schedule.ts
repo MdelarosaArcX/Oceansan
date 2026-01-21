@@ -31,4 +31,5 @@ export interface BackendSchedule {
   time: string;
   active: boolean;
   last_archived?: string; // optional
+  last_sync?: string; // optional
 }

@@ -31,6 +31,7 @@
           <template v-for="(menuItem, index) in menuList" :key="index">
             <q-item
               clickable
+              :to="menuItem.to"
               :class="[
                 menuItem.label === activeMenu
                   ? Dark.isActive
@@ -41,7 +42,6 @@
                     : 'bg-light text-dark',
               ]"
               v-ripple
-              @click="setActiveMenu(menuItem.label)"
             >
               <q-item-section avatar>
                 <q-icon :name="menuItem.icon" />
@@ -74,6 +74,7 @@ import { ref } from 'vue';
 
 import { Dark } from 'quasar';
 import { computed } from 'vue';
+import { useRoute } from 'vue-router';
 
 const isDark = computed(() => Dark.isActive);
 
@@ -85,18 +86,28 @@ function toggleDark() {
 const drawer = ref(false);
 const menuList = [
   {
+    icon: 'dashboard',
+    label: 'Dashboard',
+    separator: false,
+    to: '/dashboard',
+  },
+  {
     icon: 'monitor',
     label: 'Schedule',
     separator: false,
+    to: '/',
   },
   {
     icon: 'history_toggle_off',
     label: 'Logs',
     separator: false,
+    to: '/logs',
   },
 ];
-const activeMenu = ref('Schedule');
-function setActiveMenu(menu: string) {
-  activeMenu.value = menu;
-}
+const route = useRoute();
+
+const activeMenu = computed(() => {
+  const current = menuList.find(item => item.to === route.path);
+  return current?.label ?? '';
+});
 </script>

@@ -6,6 +6,7 @@ import { WebSocketServer } from "ws";
 import CopyService from "./services/copy.service";
 import scheduleRoutes from "./routes/schedule.routes";
 import schedulerService from "./services/scheduler.service";
+import Schedule from "./models/Schedule";
 
 const app = express();
 app.use(
@@ -54,14 +55,26 @@ app.post("/copy/start", async (req, res) => {
       type: "progress",
       jobId,
       payload: p,
+      status: "copying",
     }),
   );
-  copier.on("complete", () =>
+  copier.on("complete", async() => {
     broadcast({
       type: "complete",
       jobId,
-    }),
-  );
+      status: "",
+    });
+    console.log('sample finish');
+    await Schedule.updateOne(
+      { _id: jobId },
+      {
+        $set:
+          type === "archive"
+            ? { last_archived: new Date() }
+            : { last_sync: new Date() },
+      },
+    );
+  });
   copier.on("error", (err: Error) =>
     broadcast({ type: "error", message: err.message }),
   );

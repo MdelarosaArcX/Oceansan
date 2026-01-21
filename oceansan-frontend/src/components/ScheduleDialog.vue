@@ -80,16 +80,13 @@
                   v-model="form.src_path"
                   outlined
                   dense
-                  readonly
+                  icon="folder"
                   label="Source Folder"
                   :rules="[(val) => !!val || 'Source path is required']"
                   required
                 >
-                  <template #prepend>
+                <template #prepend>
                     <q-icon name="folder" />
-                  </template>
-                  <template #append>
-                    <q-btn flat dense icon="folder_open" @click="pickFolder('src_path')" />
                   </template>
                 </q-input>
 
@@ -97,16 +94,12 @@
                   v-model="form.dest_path"
                   outlined
                   dense
-                  readonly
                   label="Destination Folder"
                   :rules="[(val) => !!val || 'Destination path is required']"
                   required
                 >
                   <template #prepend>
                     <q-icon name="folder" />
-                  </template>
-                  <template #append>
-                    <q-btn flat dense icon="folder_open" @click="pickFolder('dest_path')" />
                   </template>
                 </q-input>
               </q-card>
@@ -263,11 +256,6 @@ watch(
   },
   { deep: true },
 );
-
-function pickFolder(dest: 'src_path' | 'dest_path') {
-  const path = prompt('Enter folder path');
-  if (path) form[dest] = path;
-}
 
 function submit() {
   emit('submit', { ...form });

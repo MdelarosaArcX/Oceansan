@@ -7,6 +7,7 @@ export const useCopyStore = defineStore('copy', {
     runningJobId: null as string | null,
     percent: 0,
     currentFile: '',
+    status: '',
   }),
 
   actions: {
@@ -17,6 +18,7 @@ export const useCopyStore = defineStore('copy', {
           this.runningJobId = jobId;
           this.percent = p.percent;
           this.currentFile = p.currentFile;
+          this.status = p.status;
         },
         (jobId) => {
           if (this.runningJobId === jobId) {
@@ -31,21 +33,7 @@ export const useCopyStore = defineStore('copy', {
       this.runningJobId = jobId;
       this.percent = 0;
       this.currentFile = '';
-
-      connectProgress(
-        (jobId, p) => {
-          this.running = true;
-          this.runningJobId = jobId;
-          this.percent = p.percent;
-          this.currentFile = p.currentFile;
-        },
-        (jobId) => {
-          if (this.runningJobId === jobId) {
-            this.running = false;
-            this.runningJobId = null;
-          }
-        },
-      );
+      this.status = '';
 
       await startCopy(from, to, type, jobId);
     },

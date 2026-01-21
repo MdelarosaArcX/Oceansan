@@ -49,6 +49,7 @@
       <template #body-cell-status="props">
         <q-td :props="props">
           <!-- Normal state -->
+          {{ store.status }}
           <q-chip
             v-if="store.runningJobId !== props.row.id"
             dense
@@ -114,7 +115,8 @@ interface JobRow {
   name: string;
   from: string;
   to: string;
-  last_archived: string;
+  last_archived?: string | null;
+  last_sync?: string | null;
   sched: number[];
   time: string;
   type: 'sync' | 'archive';
@@ -169,24 +171,25 @@ const columns: QTableColumn<JobRow>[] = [
     sortable: true,
   },
   {
-    name: 'last_archived',
-    label: 'Last Archive',
-    field: 'last_archived',
+    name: 'last_run',
+    label: 'Last Archive/Sync',
     align: 'left',
+    field: (row: JobRow) => (row.type === 'archive' ? row.last_archived : row.last_sync),
     format: (val: string | null) => {
       if (!val) return '-';
 
       return new Intl.DateTimeFormat('en-US', {
-        month: 'short', // Jan
-        day: 'numeric', // 2
-        year: 'numeric', // 2026
-        hour: 'numeric', // 2
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
         minute: '2-digit',
         hour12: true,
       }).format(new Date(val));
     },
     sortable: true,
   },
+
   {
     name: 'status',
     label: 'Status',
@@ -215,6 +218,7 @@ async function fetchSchedules() {
       to: s.dest_path,
       sched: s.days ?? [],
       last_archived: s.last_archived ?? '',
+      last_sync: s.last_sync ?? '',
       type: s.type,
       status: s.active ? 'Active' : 'In-active',
       time: s.time,
@@ -310,6 +314,8 @@ const store = useCopyStore();
 
 async function runJob(row: JobRow) {
   await store.startCopy(row.id, row.from, row.to, row.type);
+  // Refresh table
+  await fetchSchedules();
 }
 
 // Fetch schedules when the table mounts
