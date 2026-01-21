@@ -8,6 +8,7 @@ import scheduleRoutes from "./routes/schedule.routes";
 import scheduleLogsRoutes from "./routes/scheduleLogs.routes";
 import schedulerService from "./services/scheduler.service";
 import Schedule from "./models/Schedule";
+import { CopyRunnerService } from "./services/copy-runner.service";
 
 const app = express();
 app.use(
@@ -44,19 +45,21 @@ schedulerService.start(); //  REQUIRED
 
 /* ---------------- REST APIs ---------------- */
 app.post("/copy/start", async (req, res) => {
-  const { from, to, type, jobId } = req.body;
+  const { from, to, type, jobId, name } = req.body;
   if (!from || !to) {
     return res.status(400).json({ error: "Missing from/to paths" });
   }
 
   try {
-    // Trigger the scheduler's runSchedule logic
-    schedulerService.runManualSchedule({
-      src_path: from,
-      dest_path: to,
+    const runner = new CopyRunnerService(broadcast);
+
+    await runner.run({
+      scheduleId: jobId,
       type,
-      _id: jobId,        // optional, useful for broadcasting against a jobId
-      sched_name: "manual",
+      name: name,
+      source: from,
+      destination: to,
+      mode: type,
     });
 
     res.json({ status: "started" });
@@ -64,7 +67,6 @@ app.post("/copy/start", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
 
 app.use("/api/schedules", scheduleRoutes);
 app.use("/api/schedulesLogs", scheduleLogsRoutes);

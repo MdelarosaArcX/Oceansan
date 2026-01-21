@@ -48,7 +48,7 @@ class SchedulerService {
       name: schedule.sched_name,
       source: schedule.src_path,
       destination: schedule.dest_path,
-      mode: schedule.type
+      mode: schedule.type,
     });
 
     await Schedule.updateOne(
@@ -57,38 +57,11 @@ class SchedulerService {
         $set:
           schedule.type === "archive"
             ? { last_archived: new Date() }
-            : { last_sync: new Date() }
-      }
+            : { last_sync: new Date() },
+      },
     );
   }
 
-  /**
-   * Run a schedule manually without it being in DB
-   */
-  async runManualSchedule(params: {
-    src_path: string;
-    dest_path: string;
-    type: "sync" | "archive";
-    sched_name?: string;
-    _id?: string; // optional, if you want to generate logs against a jobId
-  }) {
-    // Create a real Mongoose document
-    const scheduleDoc: ISchedule = new Schedule({
-      _id: params._id ? new mongoose.Types.ObjectId(params._id) : undefined,
-      src_path: params.src_path,
-      dest_path: params.dest_path,
-      type: params.type,
-      sched_name: params.sched_name ?? "manual",
-      active: true,
-      days: [], // not relevant for manual run
-      time: "00:00", // required field by schema
-      last_archived: null,
-      last_sync: null,
-    });
-
-    // Pass it to the existing runSchedule
-    await this.runSchedule(scheduleDoc);
-  }
 }
 
 export default new SchedulerService();

@@ -60,8 +60,12 @@ export class CopyRunnerService {
     copier.on("progress", (progress) => {
       lastPercent = progress.percent;
       this.broadcaster?.({
-        type: "copy-progress",
-        payload: progress
+        type: "progress",
+        jobId: scheduleId,
+        payload: {
+          percent: progress.percent,
+          currentFile: progress.currentFile,
+        },
       });
     });
 
@@ -94,6 +98,15 @@ export class CopyRunnerService {
 
       execution.endTime = new Date();
       await execution.save();
+
+      this.broadcaster?.({
+        type: "complete",
+        jobId: scheduleId,
+        summary: {
+          totalFiles: execution.totalFiles,
+          totalSize: execution.totalSize,
+        },
+      });
 
       await appendLog("Completed");
       await appendLog(`End Time: ${new Date().toISOString()}`);

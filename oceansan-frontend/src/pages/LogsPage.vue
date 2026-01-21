@@ -145,7 +145,7 @@ const loading = ref(false);
 
 const pagination = ref({
   page: 1,
-  rowsPerPage: 2,
+  rowsPerPage: 5,
   rowsNumber: 0, // this must come from backend total
   sortBy: 'startTime',
   descending: true,
