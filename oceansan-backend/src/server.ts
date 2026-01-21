@@ -43,14 +43,25 @@ schedulerService.start(); //  REQUIRED
 /* ---------------- REST APIs ---------------- */
 
 app.post("/copy/start", async (req, res) => {
-  const { from, to, type } = req.body;
+  const { from, to, type, jobId } = req.body;
   if (!from || !to) {
     return res.status(400).json({ error: "Missing from/to paths" });
   }
 
   const copier = new CopyService();
-  copier.on("progress", (p) => broadcast({ type: "progress", payload: p }));
-  copier.on("complete", () => broadcast({ type: "complete" }));
+  copier.on("progress", (p) =>
+    broadcast({
+      type: "progress",
+      jobId,
+      payload: p,
+    }),
+  );
+  copier.on("complete", () =>
+    broadcast({
+      type: "complete",
+      jobId,
+    }),
+  );
   copier.on("error", (err: Error) =>
     broadcast({ type: "error", message: err.message }),
   );

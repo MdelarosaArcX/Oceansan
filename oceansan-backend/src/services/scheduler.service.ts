@@ -23,7 +23,7 @@ class SchedulerService {
       const schedules = await Schedule.find({
         active: true,
         time: hhmm,
-        days: today
+        days: today,
       });
 
       for (const schedule of schedules) {
@@ -39,7 +39,7 @@ class SchedulerService {
     this.running.add(schedule._id.toString());
 
     const copier = new CopyService();
-     let lastPercent = 0;
+    let lastPercent = 0;
 
     //  Prepare log file
     const logsDir = path.join(process.cwd(), "logs");
@@ -48,7 +48,7 @@ class SchedulerService {
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     const logFile = path.join(
       logsDir,
-      `log_${schedule.type}_${schedule.sched_name}_${timestamp}.txt`
+      `log_${schedule.type}_${schedule.sched_name}_${timestamp}.txt`,
     );
 
     const appendLog = async (line: string) => {
@@ -62,20 +62,34 @@ class SchedulerService {
     await appendLog("------ FILES ------");
 
     //  Broadcast start
+    // this.broadcaster?.({
+    //   type: "schedule-start",
+    //   scheduleId: schedule._id.toString(),
+    //   mode: schedule.type,
+    // });
     this.broadcaster?.({
-      type: "schedule-start",
-      scheduleId: schedule._id.toString(),
-      mode: schedule.type
+      type: "start",
+      jobId: schedule._id.toString(),
+      mode: schedule.type,
     });
 
     //  Log progress
     copier.on("progress", (progress) => {
       lastPercent = progress.percent;
 
+      // this.broadcaster?.({
+      //   type: "schedule-progress",
+      //   scheduleId: schedule._id.toString(),
+      //   payload: progress,
+      // });
+
       this.broadcaster?.({
-        type: "schedule-progress",
-        scheduleId: schedule._id.toString(),
-        payload: progress
+        type: "progress",
+        jobId: schedule._id.toString(),
+        payload: {
+          percent: progress.percent,
+          currentFile: progress.currentFile,
+        },
       });
     });
 
@@ -89,31 +103,39 @@ class SchedulerService {
 
     // File error
     copier.on("file-error", async ({ file, error }) => {
-      await appendLog(
-        `[${lastPercent}%] error: ${file} - ${error}`
-      );
+      await appendLog(`[${lastPercent}%] error: ${file} - ${error}`);
     });
-
 
     //  Complete handler
     copier.on("complete", async () => {
       // update last_archived only
       await Schedule.updateOne(
         { _id: schedule._id.toString() },
-        { $set: schedule.type === "archive" ? { last_archived: new Date() } : { last_sync: new Date() } }
+        {
+          $set:
+            schedule.type === "archive"
+              ? { last_archived: new Date() }
+              : { last_sync: new Date() },
+        },
       );
 
       this.running.delete(schedule._id.toString());
 
+      // this.broadcaster?.({
+      //   type: "schedule-complete",
+      //   scheduleId: schedule._id.toString(),
+      // });
       this.broadcaster?.({
-        type: "schedule-complete",
-        scheduleId: schedule._id.toString()
+        type: "complete",
+        jobId: schedule._id.toString(),
       });
 
       await appendLog("Schedule complete");
       await appendLog(`End Time: ${new Date().toISOString()}`);
       await appendLog("------ END ------");
-      console.log(`[${schedule.type.toUpperCase()}] Completed. Log: ${logFile}`);
+      console.log(
+        `[${schedule.type.toUpperCase()}] Completed. Log: ${logFile}`,
+      );
     });
 
     //  Error handler
@@ -123,7 +145,7 @@ class SchedulerService {
       this.broadcaster?.({
         type: "schedule-error",
         scheduleId: schedule._id,
-        message: err.message
+        message: err.message,
       });
 
       await appendLog(`ERROR: ${err.message}`);

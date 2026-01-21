@@ -140,7 +140,6 @@
                 </div>
 
                 <!-- Time -->
-                {{ form.time }}
                 <q-input
                   v-model="form.time"
                   outlined

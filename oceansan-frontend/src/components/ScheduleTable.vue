@@ -48,19 +48,27 @@
       <!-- Status column -->
       <template #body-cell-status="props">
         <q-td :props="props">
-          <q-chip v-if="!store.running" dense :color="statusColor(props.value)" text-color="white">
+          <!-- Normal state -->
+          <q-chip
+            v-if="store.runningJobId !== props.row.id"
+            dense
+            :color="statusColor(props.value)"
+            text-color="white"
+          >
             {{ props.value }}
           </q-chip>
-          <div v-if="store.running">
-          <q-linear-progress
-            :value="store.percent / 100"
-            rounded
-            stripe
-            animated
-            size="18px"
-            color="primary"
-          /><br>
-          {{ store.percent }}% — {{ store.currentFile }}
+
+          <!-- Progress ONLY for the clicked row -->
+          <div v-else>
+            <q-linear-progress
+              :value="store.percent / 100"
+              rounded
+              stripe
+              animated
+              size="18px"
+              color="primary"
+            />
+            <div class="text-caption q-mt-xs">{{ store.percent }}% — {{ store.currentFile }}</div>
           </div>
         </q-td>
       </template>
@@ -117,7 +125,8 @@ const dialog = ref(false);
 const selectedSchedule = ref<SchedulePayload | null>(null);
 
 const columns: QTableColumn<JobRow>[] = [
-  { name: 'name', label: 'Name', field: 'name', align: 'left' },
+  { name: 'name', label: 'Name', field: 'name', align: 'left', sortable: true },
+  { name: 'type', label: 'Type', field: 'type', align: 'left', sortable: true },
   {
     name: 'from',
     label: 'From',
@@ -125,6 +134,7 @@ const columns: QTableColumn<JobRow>[] = [
     align: 'left',
     classes: 'ellipsis',
     style: 'max-width: 260px',
+    sortable: true,
   },
   {
     name: 'to',
@@ -133,6 +143,7 @@ const columns: QTableColumn<JobRow>[] = [
     align: 'left',
     classes: 'ellipsis',
     style: 'max-width: 260px',
+    sortable: true,
   },
   // ✅ NEW SCHEDULE COLUMN
   {
@@ -147,6 +158,7 @@ const columns: QTableColumn<JobRow>[] = [
         .map((d) => DAY_LABELS[d])
         .join(', ');
     },
+    sortable: true,
   },
   {
     name: 'time',
@@ -154,6 +166,7 @@ const columns: QTableColumn<JobRow>[] = [
     field: 'time',
     align: 'left',
     format: (val) => formatTime12h(val),
+    sortable: true,
   },
   {
     name: 'last_archived',
@@ -172,12 +185,14 @@ const columns: QTableColumn<JobRow>[] = [
         hour12: true,
       }).format(new Date(val));
     },
+    sortable: true,
   },
   {
     name: 'status',
     label: 'Status',
     field: 'status',
     align: 'left',
+    sortable: true,
   },
   {
     name: 'action',
@@ -294,7 +309,7 @@ function shortenPath(path: string) {
 const store = useCopyStore();
 
 async function runJob(row: JobRow) {
-  await store.startCopy(row.from, row.to);
+  await store.startCopy(row.id, row.from, row.to, row.type);
 }
 
 // Fetch schedules when the table mounts

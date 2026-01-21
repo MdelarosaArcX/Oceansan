@@ -1,14 +1,17 @@
 <template>
   <q-layout view="lHh Lpr lff">
-    <q-header class="q-pl-md" style="border-bottom: 1px solid #505050;" :class="$q.dark.isActive ? 'bg-base-dark-3' : 'bg-base-light-1 text-base-dark-2'">
+    <q-header
+      class="q-pl-md"
+      style="border-bottom: 1px solid #505050"
+      :class="$q.dark.isActive ? 'bg-base-dark-3' : 'bg-base-light-1 text-base-dark-2'"
+    >
       <q-toolbar>
         <q-toolbar-title>{{ activeMenu }}</q-toolbar-title>
 
         <q-space />
 
         <!-- Dark mode toggle -->
-        <q-btn flat round dense icon="notifications">
-        </q-btn>
+        <q-btn flat round dense icon="notifications"> </q-btn>
         <q-btn flat round dense :icon="isDark ? 'dark_mode' : 'light_mode'" @click="toggleDark">
           <q-tooltip>
             {{ isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode' }}
@@ -23,7 +26,7 @@
       :breakpoint="500"
       :class="$q.dark.isActive ? '' : 'bg-base-light-2 text-base-dark-2'"
     >
-      <q-scroll-area style="height: calc(100% - 70px); margin-top: 70px">
+      <q-scroll-area style="height: calc(100% - 54px); margin-top: 43px">
         <q-list padding>
           <template v-for="(menuItem, index) in menuList" :key="index">
             <q-item
@@ -51,10 +54,10 @@
           </template>
         </q-list>
       </q-scroll-area>
-      <q-img class="absolute-top" style="height: 70px">
-        <div class="absolute-bottom bg-transparent">
+      <q-img class="absolute-top" style="height: 54px">
+        <div class="absolute-bottom bg-transparent" style="padding: 0px">
           <div class="text-weight-bold" :class="$q.dark.isActive ? '' : 'text-base-dark-2'">
-            OCEANSAN
+            <q-img src="/oceansan.png" spinner-color="white" />
           </div>
         </div>
       </q-img>
@@ -83,7 +86,7 @@ const drawer = ref(false);
 const menuList = [
   {
     icon: 'monitor',
-    label: 'Dashboard',
+    label: 'Schedule',
     separator: false,
   },
   {
@@ -92,7 +95,7 @@ const menuList = [
     separator: false,
   },
 ];
-const activeMenu = ref('Dashboard');
+const activeMenu = ref('Schedule');
 function setActiveMenu(menu: string) {
   activeMenu.value = menu;
 }

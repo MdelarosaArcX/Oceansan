@@ -10,13 +10,13 @@ type ProgressPayload = {
   currentFile: string;
 };
 
-export function startCopy(from: string, to: string) {
-  return axios.post(`${API_URL}/copy/start`, { from, to });
+export function startCopy(from: string, to: string, type: string, id: string) {
+  return axios.post(`${API_URL}/copy/start`, { from, to, type, id });
 }
 
 export function connectProgress(
-  onProgress: (p: ProgressPayload) => void,
-  onComplete: () => void
+  onProgress: (jobId: string, p: ProgressPayload) => void,
+  onComplete: (jobId: string) => void
 ) {
   socket = new WebSocket(WS_URL);
 
@@ -24,11 +24,11 @@ export function connectProgress(
     const data = JSON.parse(event.data);
 
     if (data.type === "progress") {
-      onProgress(data.payload);
+      onProgress(data.jobId, data.payload);
     }
 
     if (data.type === "complete") {
-      onComplete();
+      onComplete(data.jobId);
     }
   };
 }
