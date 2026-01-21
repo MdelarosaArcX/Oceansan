@@ -48,7 +48,6 @@ class SchedulerService {
       name: schedule.sched_name,
       source: schedule.src_path,
       destination: schedule.dest_path,
-      mode: schedule.type,
     });
 
     await Schedule.updateOne(

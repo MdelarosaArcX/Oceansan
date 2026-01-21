@@ -6,7 +6,7 @@ import ScheduleLogs from "../models/ScheduleLogs";
 type Broadcaster = (data: unknown) => void;
 
 export class CopyRunnerService {
-  constructor(private broadcaster?: Broadcaster) {}
+  constructor(private broadcaster?: Broadcaster) { }
 
   async run({
     scheduleId,
@@ -14,14 +14,12 @@ export class CopyRunnerService {
     name,
     source,
     destination,
-    mode // "archive" | "sync"
   }: {
     scheduleId?: string;
     type: "archive" | "sync";
     name: string;
     source: string;
     destination: string;
-    mode: "archive" | "sync";
   }) {
     const copier = new CopyService();
     let finished = false;
@@ -52,7 +50,9 @@ export class CopyRunnerService {
     const appendLog = (line: string) =>
       fs.appendFile(logFile, line + "\n");
 
-    await appendLog(`${type.toUpperCase()} started`);
+    await appendLog(`${type.toUpperCase()} STARTED`);
+    await appendLog(`ID: ${scheduleId}`);
+    await appendLog(`Name: ${name}`);
     await appendLog(`Source: ${source}`);
     await appendLog(`Destination: ${destination}`);
 
@@ -84,6 +84,16 @@ export class CopyRunnerService {
     copier.on("file-copied", async ({ file, size }) => {
       await recordFile("copied", file, size);
       await appendLog(`[${lastPercent}%] ✔ copied: ${file}`);
+    });
+
+    copier.on("file-updated", async ({ file, size }) => {
+      await recordFile("updated", file, size);
+      await appendLog(`[${lastPercent}%] 🔄 updated: ${file}`);
+    });
+
+    copier.on("file-deleted", async ({ file }) => {
+      await recordFile("deleted", file);
+      await appendLog(`[${lastPercent}%] 🗑 deleted: ${file}`);
     });
 
     copier.on("file-error", async ({ file, error }) => {
@@ -123,7 +133,7 @@ export class CopyRunnerService {
     });
 
     /* ---------- EXECUTE ---------- */
-    if (mode === "archive") {
+    if (type === "archive") {
       await copier._archive(source, destination);
     } else {
       await copier._sync(source, destination);

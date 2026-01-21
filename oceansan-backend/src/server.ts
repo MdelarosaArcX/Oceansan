@@ -59,7 +59,7 @@ app.post("/copy/start", async (req, res) => {
       name: name,
       source: from,
       destination: to,
-      mode: type,
+      
     });
 
     res.json({ status: "started" });

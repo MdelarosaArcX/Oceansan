@@ -64,3 +64,13 @@ DELETE {{host}}/api/schedules/{{scheduleId}}
 
 ### GET Schedule Logs
 GET {{host}}/api/schedulesLogs?page=1&rowsPerPage=3&sortBy=createdAt&descending=true
+
+
+### MANUAL RUN
+POST {{host}}/copy/start
+{{json}}
+
+{"from":"C:/Users/tamid/OneDrive/Desktop/EVFSource","to":"C:/Users/tamid/OneDrive/Desktop/SCHTarget","type":"sync","jobId":"697038e237ef6e91b5d3191d","name":"name"}
+
+
+
