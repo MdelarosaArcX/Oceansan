@@ -28,12 +28,12 @@ POST {{host}}/api/schedules
 {{json}}
 
 {
-    "sched_name":"sync test 11",
+    "sched_name":"sync test 14",
   "src_path": "C:/Users/tamid/OneDrive/Desktop/EVFSource",
   "dest_path": "C:/Users/tamid/OneDrive/Desktop/SCHTarget",
   "days": [3],
   "type": "archive",
-  "time": "17:07",
+  "time": "18:21",
   "active": true
 }
 
