@@ -4,6 +4,7 @@ import path from "path";
 import Schedule, { ISchedule } from "../models/Schedule";
 import ScheduleLogs from "../models/ScheduleLogs";
 import CopyService from "./copy.service";
+import mongoose from "mongoose";
 
 type Broadcaster = (data: unknown) => void;
 
@@ -242,6 +243,34 @@ class SchedulerService {
     } catch (err) {
       copier.emit("error", err as Error);
     }
+  }
+
+  /**
+   * Run a schedule manually without it being in DB
+   */
+  async runManualSchedule(params: {
+    src_path: string;
+    dest_path: string;
+    type: "sync" | "archive";
+    sched_name?: string;
+    _id?: string; // optional, if you want to generate logs against a jobId
+  }) {
+    // Create a real Mongoose document
+    const scheduleDoc: ISchedule = new Schedule({
+      _id: params._id ? new mongoose.Types.ObjectId(params._id) : undefined,
+      src_path: params.src_path,
+      dest_path: params.dest_path,
+      type: params.type,
+      sched_name: params.sched_name ?? "manual",
+      active: true,
+      days: [], // not relevant for manual run
+      time: "00:00", // required field by schema
+      last_archived: null,
+      last_sync: null,
+    });
+
+    // Pass it to the existing runSchedule
+    await this.runSchedule(scheduleDoc);
   }
 }
 

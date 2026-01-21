@@ -43,55 +43,28 @@ schedulerService.setBroadcaster(broadcast); // optional but useful
 schedulerService.start(); //  REQUIRED
 
 /* ---------------- REST APIs ---------------- */
-
 app.post("/copy/start", async (req, res) => {
   const { from, to, type, jobId } = req.body;
   if (!from || !to) {
     return res.status(400).json({ error: "Missing from/to paths" });
   }
 
-  const copier = new CopyService();
-  copier.on("progress", (p) =>
-    broadcast({
-      type: "progress",
-      jobId,
-      payload: p,
-      status: "copying",
-    }),
-  );
-  copier.on("complete", async() => {
-    broadcast({
-      type: "complete",
-      jobId,
-      status: "",
-    });
-    console.log('sample finish');
-    await Schedule.updateOne(
-      { _id: jobId },
-      {
-        $set:
-          type === "archive"
-            ? { last_archived: new Date() }
-            : { last_sync: new Date() },
-      },
-    );
-  });
-  copier.on("error", (err: Error) =>
-    broadcast({ type: "error", message: err.message }),
-  );
-
   try {
-    if (type === "sync") {
-      await copier._sync(from, to);
-    } else {
-      await copier._archive(from, to);
-    }
+    // Trigger the scheduler's runSchedule logic
+    schedulerService.runManualSchedule({
+      src_path: from,
+      dest_path: to,
+      type,
+      _id: jobId,        // optional, useful for broadcasting against a jobId
+      sched_name: "manual",
+    });
 
     res.json({ status: "started" });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 app.use("/api/schedules", scheduleRoutes);
 app.use("/api/schedulesLogs", scheduleLogsRoutes);

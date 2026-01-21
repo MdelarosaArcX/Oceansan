@@ -131,7 +131,7 @@ const columns: QTableColumn<JobRow>[] = [
   { name: 'type', label: 'Type', field: 'type', align: 'left', sortable: true },
   {
     name: 'from',
-    label: 'From',
+    label: 'Source',
     field: 'from',
     align: 'left',
     classes: 'ellipsis',
@@ -140,7 +140,7 @@ const columns: QTableColumn<JobRow>[] = [
   },
   {
     name: 'to',
-    label: 'To',
+    label: 'Destination',
     field: 'to',
     align: 'left',
     classes: 'ellipsis',
