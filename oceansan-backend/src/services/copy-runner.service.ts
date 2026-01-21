@@ -2,6 +2,7 @@ import fs from "fs-extra";
 import path from "path";
 import CopyService from "./copy.service";
 import ScheduleLogs from "../models/ScheduleLogs";
+import Schedule, { ISchedule } from "../models/Schedule";
 
 type Broadcaster = (data: unknown) => void;
 
@@ -83,22 +84,22 @@ export class CopyRunnerService {
 
     copier.on("file-copied", async ({ file, size }) => {
       await recordFile("copied", file, size);
-      await appendLog(`[${lastPercent}%] ✔ copied: ${file}`);
+      await appendLog(`[${lastPercent}%] copied: ${file}`);
     });
 
     copier.on("file-updated", async ({ file, size }) => {
       await recordFile("updated", file, size);
-      await appendLog(`[${lastPercent}%] 🔄 updated: ${file}`);
+      await appendLog(`[${lastPercent}%] updated: ${file}`);
     });
 
     copier.on("file-deleted", async ({ file }) => {
       await recordFile("deleted", file);
-      await appendLog(`[${lastPercent}%] 🗑 deleted: ${file}`);
+      await appendLog(`[${lastPercent}%] deleted: ${file}`);
     });
 
     copier.on("file-error", async ({ file, error }) => {
       await recordFile("error", file, 0, error);
-      await appendLog(`[${lastPercent}%] ❌ ${file} - ${error}`);
+      await appendLog(`[${lastPercent}%] ${file} - ${error}`);
     });
 
     /* ---------- COMPLETE ---------- */
@@ -120,6 +121,16 @@ export class CopyRunnerService {
 
       await appendLog("Completed");
       await appendLog(`End Time: ${new Date().toISOString()}`);
+
+      await Schedule.updateOne(
+        { _id: scheduleId },
+        {
+          $set:
+            type === "archive"
+              ? { last_archived: new Date() }
+              : { last_sync: new Date() },
+        },
+      );
     });
 
     copier.on("error", async (err: Error) => {
