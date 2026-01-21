@@ -2,6 +2,7 @@ import cron from "node-cron";
 import fs from "fs-extra";
 import path from "path";
 import Schedule, { ISchedule } from "../models/Schedule";
+import ScheduleExecution from "../models/ScheduleExecution";
 import CopyService from "./copy.service";
 
 type Broadcaster = (data: unknown) => void;
@@ -18,7 +19,7 @@ class SchedulerService {
     cron.schedule("* * * * *", async () => {
       const now = new Date();
       const hhmm = now.toTimeString().slice(0, 5); // HH:mm
-      const today = now.getDay();
+      const today = now.getDay(); // 0–6
 
       const schedules = await Schedule.find({
         active: true,
@@ -27,7 +28,8 @@ class SchedulerService {
       });
 
       for (const schedule of schedules) {
-        if (this.running.has(schedule._id.toString())) continue;
+        const id = schedule._id.toString();
+        if (this.running.has(id)) continue;
         this.runSchedule(schedule);
       }
     });
@@ -36,12 +38,26 @@ class SchedulerService {
   }
 
   private async runSchedule(schedule: ISchedule) {
-    this.running.add(schedule._id.toString());
+    const scheduleId = schedule._id.toString();
+    this.running.add(scheduleId);
 
     const copier = new CopyService();
+    let finished = false;
     let lastPercent = 0;
 
-    //  Prepare log file
+    /* -------------------- Execution Record -------------------- */
+    const execution = await ScheduleExecution.create({
+      scheduleId: schedule._id,
+      type: schedule.type,
+      source: schedule.src_path,
+      destination: schedule.dest_path,
+      startTime: new Date(),
+      totalFiles: 0,
+      totalSize: 0,
+      files: [],
+    });
+
+    /* -------------------- Log File -------------------- */
     const logsDir = path.join(process.cwd(), "logs");
     await fs.ensureDir(logsDir);
 
@@ -73,7 +89,16 @@ class SchedulerService {
       mode: schedule.type,
     });
 
-    //  Log progress
+    /* -------------------- Batched DB Save -------------------- */
+    let pendingWrites = 0;
+    const flushExecution = async () => {
+      if (pendingWrites > 0) {
+        await execution.save();
+        pendingWrites = 0;
+      }
+    };
+
+    /* -------------------- Progress -------------------- */
     copier.on("progress", (progress) => {
       lastPercent = progress.percent;
 
@@ -93,24 +118,66 @@ class SchedulerService {
       });
     });
 
-    // File success
-    copier.on("file-success", async ({ file, copiedSize, totalSize }) => {
-      const percent = Math.floor((copiedSize / totalSize) * 100);
-      lastPercent = percent;
+    /* -------------------- File Events -------------------- */
 
-      await appendLog(`[${percent}%] copied: ${file}`);
+    const recordFile = async (
+      status: "copied" | "updated" | "deleted" | "error",
+      file: string,
+      size = 0,
+      error?: string,
+    ) => {
+      execution.files.push({
+        path: file,
+        size,
+        status,
+        error,
+      });
+
+      execution.totalFiles++;
+
+      if (status === "copied" || status === "updated") {
+        execution.totalSize += size;
+      }
+
+      pendingWrites++;
+
+      if (pendingWrites >= 20) {
+        await flushExecution();
+      }
+    };
+
+    copier.on("file-copied", async ({ file, size }) => {
+      await recordFile("copied", file, size);
+      await appendLog(`[${lastPercent}%] ✔ copied: ${file}`);
     });
 
-    // File error
+    copier.on("file-updated", async ({ file, size }) => {
+      await recordFile("updated", file, size);
+      await appendLog(`[${lastPercent}%] 🔄 updated: ${file}`);
+    });
+
+    copier.on("file-deleted", async ({ file }) => {
+      await recordFile("deleted", file);
+      await appendLog(`[${lastPercent}%] 🗑 deleted: ${file}`);
+    });
+
     copier.on("file-error", async ({ file, error }) => {
-      await appendLog(`[${lastPercent}%] error: ${file} - ${error}`);
+      await recordFile("error", file, 0, error);
+      await appendLog(`[${lastPercent}%]  error: ${file} - ${error}`);
     });
 
-    //  Complete handler
+    /* -------------------- Complete -------------------- */
     copier.on("complete", async () => {
-      // update last_archived only
+      if (finished) return;
+      finished = true;
+
+      await flushExecution();
+
+      execution.endTime = new Date();
+      await execution.save();
+
       await Schedule.updateOne(
-        { _id: schedule._id.toString() },
+        { _id: schedule._id },
         {
           $set:
             schedule.type === "archive"
@@ -119,7 +186,7 @@ class SchedulerService {
         },
       );
 
-      this.running.delete(schedule._id.toString());
+      this.running.delete(scheduleId);
 
       // this.broadcaster?.({
       //   type: "schedule-complete",
@@ -128,23 +195,36 @@ class SchedulerService {
       this.broadcaster?.({
         type: "complete",
         jobId: schedule._id.toString(),
+        summary: {
+          totalFiles: execution.totalFiles,
+          totalSize: execution.totalSize,
+        },
       });
 
       await appendLog("Schedule complete");
       await appendLog(`End Time: ${new Date().toISOString()}`);
       await appendLog("------ END ------");
+
       console.log(
         `[${schedule.type.toUpperCase()}] Completed. Log: ${logFile}`,
       );
     });
 
-    //  Error handler
+    /* -------------------- Error -------------------- */
     copier.on("error", async (err: Error) => {
-      this.running.delete(schedule._id.toString());
+      if (finished) return;
+      finished = true;
+
+      await flushExecution();
+
+      execution.endTime = new Date();
+      await execution.save();
+
+      this.running.delete(scheduleId);
 
       this.broadcaster?.({
         type: "schedule-error",
-        scheduleId: schedule._id,
+        scheduleId,
         message: err.message,
       });
 
@@ -152,16 +232,15 @@ class SchedulerService {
       console.error(`[${schedule.type.toUpperCase()}] Error: ${err.message}`);
     });
 
-    //  Execute proper method
-
+    /* -------------------- Execute -------------------- */
     try {
       if (schedule.type === "archive") {
         await copier._archive(schedule.src_path, schedule.dest_path);
-      } else if (schedule.type === "sync") {
+      } else {
         await copier._sync(schedule.src_path, schedule.dest_path);
       }
     } catch (err) {
-      copier.emit("error", err);
+      copier.emit("error", err as Error);
     }
   }
 }
