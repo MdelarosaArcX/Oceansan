@@ -1,7 +1,7 @@
 <template>
   <q-page :class="$q.dark.isActive ? 'bg-base-dark-3' : 'bg-base-light-1'">
     <div class="q-pa-lg">
-      <q-card class="dashboard-card">
+      <q-card class="dashboard-card modern-card">
         <q-card-section class="row items-center q-gutter-sm">
           <q-icon name="history" color="primary" size="20px" />
           <div class="text-subtitle1 text-weight-medium">Job Logs</div>
@@ -12,7 +12,6 @@
         <q-table
           binary-state-sort
           flat
-          bordered
           row-key="_id"
           :rows="rows"
           :columns="columns"
@@ -20,6 +19,8 @@
           v-model:pagination="pagination"
           :rows-number="pagination.rowsNumber"
           :rows-per-page-options="[3, 5, 10, 20]"
+          separator="horizontal"
+          class="modern-table"
           @request="onRequest"
         >
           <!-- Header -->
@@ -41,45 +42,78 @@
                   round
                   flat
                   size="sm"
-                  icon="expand_more"
+                  icon="keyboard_arrow_down"
                   @click="props.expand = !props.expand"
-                  :class="{ 'rotate-180': props.expand }"
+                  :class="['expand-btn', { expanded: props.expand }]"
                 />
               </q-td>
 
-              <q-td v-for="col in props.cols" :key="col.name" :props="props">
+              <!-- <q-td v-for="col in props.cols" :key="col.name" :props="props">
                 {{ col.value }}
+              </q-td> -->
+              <q-td v-for="col in props.cols" :key="col.name" :props="props">
+                <template v-if="col.name === 'source' || col.name === 'destination'">
+                  <div class="path-cell">
+                    <q-icon name="folder" size="16px" class="q-mr-xs text-grey-6" />
+                    <span class="path-text">
+                      {{ shortenPath(col.value) }}
+                      <q-tooltip>{{ col.value }}</q-tooltip>
+                    </span>
+                  </div>
+                </template>
+
+                <template v-else>
+                  {{ col.value }}
+                </template>
               </q-td>
             </q-tr>
 
             <q-tr v-show="props.expand">
-              <q-td colspan="100%" class="q-pa-md bg-grey-1">
-                <q-table
-                  dense
-                  flat
-                  row-key="_id"
-                  :rows="props.row.files"
-                  :columns="fileColumns"
-                  hide-bottom
-                >
-                  <template #body-cell-size="fprops">
-                    <q-td :props="fprops">
-                      {{ formatBytes(fprops.value) }}
-                    </q-td>
-                  </template>
+              <q-td colspan="100%" class="expand-panel">
+                <q-card flat bordered class="expand-card">
+                  <q-table
+                    dense
+                    flat
+                    row-key="_id"
+                    :rows="props.row.files"
+                    :columns="fileColumns"
+                    hide-bottom
+                  >
+                    <template #body-cell-size="fprops">
+                      <q-td :props="fprops">
+                        {{ formatBytes(fprops.value) }}
+                      </q-td>
+                    </template>
 
-                  <template #body-cell-status="fprops">
-                    <q-td :props="fprops">
-                      <q-chip dense :color="fileStatusColor(fprops.value)" text-color="white">
-                        {{ fprops.value }}
-                      </q-chip>
-                    </q-td>
-                  </template>
-                </q-table>
+                    <template #body-cell-status="fprops">
+                      <q-td :props="fprops">
+                        <q-chip dense :color="fileStatusColor(fprops.value)" text-color="white">
+                          {{ fprops.value }}
+                        </q-chip>
+                      </q-td>
+                    </template>
+                  </q-table>
+                </q-card>
               </q-td>
             </q-tr>
           </template>
+          <!-- <template #body-cell-source="props">
+            <q-td :props="props">
+              <span class="ellipsis">
+                {{ shortenPath(props.value) }}
+                <q-tooltip>{{ props.value }}</q-tooltip>
+              </span>
+            </q-td>
+          </template>
 
+          <template #body-cell-destination="props">
+            <q-td :props="props">
+              <span class="ellipsis">
+                {{ shortenPath(props.value) }}
+                <q-tooltip>{{ props.value }}</q-tooltip>
+              </span>
+            </q-td>
+          </template> -->
           <!-- Loading overlay -->
           <template #loading>
             <q-inner-loading showing>
@@ -109,7 +143,7 @@ interface FileLog {
   _id: string;
   path: string;
   size: number;
-  status: 'copied' | 'failed' | 'pending';
+  status: 'copied' | 'failed' | 'pending' | 'updated' | 'deleted';
 }
 
 interface QTableRequestPagination {
@@ -155,14 +189,36 @@ const pagination = ref({
  Columns (Main table)
 --------------------------*/
 const columns: QTableColumn<JobLog>[] = [
-  { name: 'type', label: 'Type', field: 'type', sortable: true },
-  { name: 'source', label: 'Source', field: 'source' },
-  { name: 'destination', label: 'Destination', field: 'destination' },
+  {
+    name: 'type',
+    label: 'Type',
+    field: 'type',
+    align: 'left',
+    sortable: true,
+    format: (val) => (val ? val.charAt(0).toUpperCase() + val.slice(1) : ''),
+  },
+  {
+    name: 'source',
+    label: 'Source',
+    field: 'source',
+    align: 'left',
+    classes: 'ellipsis',
+    style: 'max-width: 260px',
+  },
+  {
+    name: 'destination',
+    label: 'Destination',
+    field: 'destination',
+    align: 'left',
+    classes: 'ellipsis',
+    style: 'max-width: 260px',
+  },
   {
     name: 'startTime',
     label: 'Start Time',
     field: 'startTime',
     sortable: true,
+    align: 'center',
     format: (val: string) =>
       new Intl.DateTimeFormat('en-US', {
         month: 'short',
@@ -178,6 +234,7 @@ const columns: QTableColumn<JobLog>[] = [
     label: 'End Time',
     field: 'endTime',
     sortable: true,
+    align: 'center',
     format: (val: string) =>
       new Intl.DateTimeFormat('en-US', {
         month: 'short',
@@ -188,7 +245,7 @@ const columns: QTableColumn<JobLog>[] = [
         hour12: true,
       }).format(new Date(val)),
   },
-  { name: 'totalFiles', label: 'Files', field: 'totalFiles', align: 'right' },
+  { name: 'totalFiles', label: 'Files', field: 'totalFiles', align: 'center' },
   {
     name: 'totalSize',
     label: 'Total Size',
@@ -250,11 +307,19 @@ function fileStatusColor(status: FileLog['status']) {
       return 'positive';
     case 'failed':
       return 'negative';
+    case 'deleted':
+      return 'negative';
     case 'pending':
+      return 'warning';
+    case 'updated':
       return 'warning';
     default:
       return 'grey';
   }
+}
+function shortenPath(path: string) {
+  if (!path) return '—';
+  return path.split(/[\\/]/).slice(-4).join('/');
 }
 
 /* -------------------------
@@ -264,3 +329,75 @@ onMounted(async () => {
   await onRequest({ pagination: pagination.value });
 });
 </script>
+<style scoped>
+/* Card */
+.modern-card {
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+}
+
+/* Table */
+.modern-table .q-tr {
+  transition: background-color 0.2s ease;
+}
+
+.modern-table .q-tr:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.body--dark .modern-table .q-tr:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Expand button */
+.expand-btn {
+  transition: transform 0.2s ease;
+}
+
+.expand-btn.expanded {
+  transform: rotate(180deg);
+}
+
+/* Path cells */
+.path-cell {
+  display: flex;
+  align-items: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+}
+
+.path-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+}
+
+/* Expand panel */
+.expand-panel {
+  background: transparent;
+  padding: 12px 24px;
+}
+
+.expand-card {
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.body--dark .expand-card {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Status chips (soft) */
+.q-chip.positive {
+  background: #21ba45;
+}
+
+.q-chip.warning {
+  background: #f2c037;
+}
+
+.q-chip.negative {
+  background: #c10015;
+}
+</style>

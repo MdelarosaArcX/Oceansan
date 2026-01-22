@@ -1,6 +1,6 @@
 <template>
-  <q-card class="dashboard-card">
-    <q-card-section class="row items-center justify-between">
+  <q-card class="dashboard-card modern-card">
+    <q-card-section class="row items-center justify-between q-pb-sm">
       <div class="row items-center q-gutter-sm">
         <q-icon name="list_alt" color="primary" size="20px" />
         <div class="text-subtitle1 text-weight-medium">Schedules</div>
@@ -8,7 +8,7 @@
 
       <q-btn
         unelevated
-        :color="$q.dark.isActive ? 'base-dark-3' : 'base-dark-2'"
+        :class="$q.dark.isActive ? 'bg-accent  text-base-dark-3' : 'bg-base-dark-2 text-base-light-1'"
         icon="add_circle"
         rounded
         label="Create Schedule"
@@ -21,6 +21,7 @@
 
     <q-table
       flat
+      class="modern-table"
       :rows="rows"
       :columns="columns"
       row-key="id"
@@ -29,65 +30,69 @@
     >
       <template #body-cell-from="props">
         <q-td :props="props">
-          <span class="ellipsis">
-            {{ shortenPath(props.value) }}
-            <q-tooltip>{{ props.value }}</q-tooltip>
-          </span>
+          <div class="path-cell">
+            <q-icon name="folder" size="16px" class="q-mr-xs text-grey-6" />
+            <span class="path-text">
+              {{ shortenPath(props.value) }}
+              <q-tooltip>{{ props.value }}</q-tooltip>
+            </span>
+          </div>
         </q-td>
       </template>
 
       <template #body-cell-to="props">
         <q-td :props="props">
-          <span class="ellipsis">
-            {{ shortenPath(props.value) }}
-            <q-tooltip>{{ props.value }}</q-tooltip>
-          </span>
+          <div class="path-cell">
+            <q-icon name="folder_open" size="16px" class="q-mr-xs text-grey-6" />
+            <span class="path-text">
+              {{ shortenPath(props.value) }}
+              <q-tooltip>{{ props.value }}</q-tooltip>
+            </span>
+          </div>
         </q-td>
       </template>
 
       <!-- Status column -->
       <template #body-cell-status="props">
         <q-td :props="props">
-          <!-- Normal state -->
-          {{ store.status }}
-          <q-chip
-            v-if="store.runningJobId !== props.row.id"
-            dense
-            :color="statusColor(props.value)"
-            text-color="white"
-          >
-            {{ props.value }}
-          </q-chip>
+          <div v-if="store.runningJobId !== props.row.id" class="status-cell">
+            <q-chip dense rounded :color="statusColor(props.value)" text-color="white">
+              {{ props.value }}
+            </q-chip>
+          </div>
 
-          <!-- Progress ONLY for the clicked row -->
-          <div v-else>
+          <div v-else class="progress-cell">
             <q-linear-progress
               :value="store.percent / 100"
               rounded
               stripe
               animated
-              size="18px"
+              size="14px"
               color="primary"
             />
-            <div class="text-caption q-mt-xs">{{ store.percent }}% — {{ store.currentFile }}</div>
+            <div class="text-caption text-grey q-mt-xs ellipsis">
+              {{ store.percent }}% — {{ store.currentFile }}
+            </div>
           </div>
         </q-td>
       </template>
 
       <!-- Action column -->
       <template #body-cell-action="props">
-        <q-td :props="props" class="q-gutter-xs">
-          <q-btn dense flat icon="play_arrow" color="primary" @click="runJob(props.row)">
-            <q-tooltip>Run</q-tooltip>
-          </q-btn>
+        <q-td :props="props">
+          <div class="action-cell">
+            <q-btn dense flat round icon="play_arrow" color="primary" @click="runJob(props.row)">
+              <q-tooltip>Run</q-tooltip>
+            </q-btn>
 
-          <q-btn dense flat icon="edit" color="primary" @click="openEdit(props.row)">
-            <q-tooltip>Edit</q-tooltip>
-          </q-btn>
+            <q-btn dense flat round icon="edit" :color="$q.dark.isActive ? 'accent' : 'base-dark-2'" @click="openEdit(props.row)">
+              <q-tooltip>Edit</q-tooltip>
+            </q-btn>
 
-          <q-btn dense flat icon="delete" class="text-red" @click="deleteJob(props.row)">
-            <q-tooltip>Delete</q-tooltip>
-          </q-btn>
+            <q-btn dense flat round icon="delete" color="negative" @click="deleteJob(props.row)">
+              <q-tooltip>Delete</q-tooltip>
+            </q-btn>
+          </div>
         </q-td>
       </template>
     </q-table>
@@ -194,14 +199,14 @@ const columns: QTableColumn<JobRow>[] = [
     name: 'status',
     label: 'Status',
     field: 'status',
-    align: 'left',
+    align: 'center',
     sortable: true,
   },
   {
     name: 'action',
     label: 'Action',
     field: () => null,
-    align: 'right',
+    align: 'center',
   },
 ];
 
@@ -321,3 +326,61 @@ async function runJob(row: JobRow) {
 // Fetch schedules when the table mounts
 onMounted(fetchSchedules);
 </script>
+<style scoped>
+/* Card */
+.modern-card {
+  border-radius: 14px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.06);
+}
+
+/* Table */
+.modern-table .q-tr {
+  transition: background-color 0.15s ease;
+}
+
+.modern-table .q-tr:hover {
+  background: rgba(0, 0, 0, 0.035);
+}
+
+.body--dark .modern-table .q-tr:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* Path */
+.path-cell {
+  display: flex;
+  align-items: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+}
+
+.path-text {
+  max-width: 220px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Status */
+.status-cell {
+  display: flex;
+  justify-content: center;
+}
+
+/* Progress */
+.progress-cell {
+  min-width: 180px;
+}
+
+/* Actions */
+.action-cell {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+
+/* Subtle divider feel */
+.q-table__middle {
+  border-radius: 12px;
+}
+</style>
