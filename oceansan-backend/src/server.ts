@@ -5,7 +5,10 @@ import cors from "cors";
 import { WebSocketServer } from "ws";
 import CopyService from "./services/copy.service";
 import scheduleRoutes from "./routes/schedule.routes";
+import scheduleLogsRoutes from "./routes/scheduleLogs.routes";
 import schedulerService from "./services/scheduler.service";
+import Schedule from "./models/Schedule";
+import { CopyRunnerService } from "./services/copy-runner.service";
 
 const app = express();
 app.use(
@@ -41,26 +44,23 @@ schedulerService.setBroadcaster(broadcast); // optional but useful
 schedulerService.start(); //  REQUIRED
 
 /* ---------------- REST APIs ---------------- */
-
 app.post("/copy/start", async (req, res) => {
-  const { from, to, type } = req.body;
+  const { from, to, type, jobId, name } = req.body;
   if (!from || !to) {
     return res.status(400).json({ error: "Missing from/to paths" });
   }
 
-  const copier = new CopyService();
-  copier.on("progress", (p) => broadcast({ type: "progress", payload: p }));
-  copier.on("complete", () => broadcast({ type: "complete" }));
-  copier.on("error", (err: Error) =>
-    broadcast({ type: "error", message: err.message }),
-  );
-
   try {
-    if (type === "sync") {
-      await copier._sync(from, to);
-    } else {
-      await copier._archive(from, to);
-    }
+    const runner = new CopyRunnerService(broadcast);
+
+    await runner.run({
+      scheduleId: jobId,
+      type,
+      name: name,
+      source: from,
+      destination: to,
+      
+    });
 
     res.json({ status: "started" });
   } catch (err: any) {
@@ -69,6 +69,7 @@ app.post("/copy/start", async (req, res) => {
 });
 
 app.use("/api/schedules", scheduleRoutes);
+app.use("/api/schedulesLogs", scheduleLogsRoutes);
 
 /* ---------------- Start Server ---------------- */
 

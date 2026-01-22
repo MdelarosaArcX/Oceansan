@@ -28,12 +28,12 @@ POST {{host}}/api/schedules
 {{json}}
 
 {
-    "sched_name":"archive test 1",
+    "sched_name":"sync test 14",
   "src_path": "C:/Users/tamid/OneDrive/Desktop/EVFSource",
   "dest_path": "C:/Users/tamid/OneDrive/Desktop/SCHTarget",
-  "days": [2],
+  "days": [3],
   "type": "archive",
-  "time": "19:51",
+  "time": "18:21",
   "active": true
 }
 
@@ -61,3 +61,16 @@ PUT {{host}}/api/schedules/{{scheduleId}}
 
 ### Delete Schedule
 DELETE {{host}}/api/schedules/{{scheduleId}}
+
+### GET Schedule Logs
+GET {{host}}/api/schedulesLogs?page=1&rowsPerPage=3&sortBy=createdAt&descending=true
+
+
+### MANUAL RUN
+POST {{host}}/copy/start
+{{json}}
+
+{"from":"C:/Users/tamid/OneDrive/Desktop/EVFSource","to":"C:/Users/tamid/OneDrive/Desktop/SCHTarget","type":"sync","jobId":"697038e237ef6e91b5d3191d","name":"name"}
+
+
+

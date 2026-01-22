@@ -16,136 +16,121 @@ export default class CopyService extends EventEmitter {
 
     let copiedSize = 0;
 
-    const startPayload: CopyStart = {
+    this.emit("start", {
       totalFiles: files.length,
       totalSize
-    };
-
-    this.emit("start", startPayload);
+    });
 
     for (const file of files) {
       const relative = path.relative(from, file.path);
       const destination = path.join(to, relative);
 
-      this.emit("file-start", { file: relative });
+      try {
+        await fse.ensureDir(path.dirname(destination));
 
-      await fse.ensureDir(path.dirname(destination));
+        await new Promise<void>((resolve, reject) => {
+          const read = fs.createReadStream(file.path);
+          const write = fs.createWriteStream(destination);
 
-      await new Promise<void>((resolve, reject) => {
-        const read = fs.createReadStream(file.path);
-        const write = fs.createWriteStream(destination);
+          read.on("data", (chunk: Buffer) => {
+            copiedSize += chunk.length;
 
-        read.on("data", (chunk: Buffer) => {
-          copiedSize += chunk.length;
-
-          this.emit("progress", {
-            copiedSize,
-            totalSize,
-            percent: Math.floor((copiedSize / totalSize) * 100),
-            currentFile: relative
+            this.emit("progress", {
+              copiedSize,
+              totalSize,
+              percent: Math.floor((copiedSize / totalSize) * 100),
+              currentFile: relative
+            });
           });
+
+          read.on("error", reject);
+          write.on("error", reject);
+
+          write.on("finish", resolve);
+          read.pipe(write);
         });
 
-        read.on("error", (err) => {
-          this.emit("file-error", {
-            file: relative,
-            error: err.message
-          });
-          reject(err);
+        //  FILE SUCCESS
+        this.emit("file-copied", {
+          file: relative,
+          size: file.size
         });
 
-        write.on("error", (err) => {
-          this.emit("file-error", {
-            file: relative,
-            error: err.message
-          });
-          reject(err);
+      } catch (err: any) {
+        //  FILE ERROR
+        this.emit("file-error", {
+          file: relative,
+          error: err.message
         });
-
-        write.on("finish", () => {
-          this.emit("file-success", {
-            file: relative,
-            copiedSize,
-            totalSize
-          });
-          resolve();
-        });
-
-        read.pipe(write);
-      });
-    }
-
-    const completePayload: CopyComplete = {
-      copiedSize,
-      totalSize
-    };
-
-    this.emit("complete", completePayload);
-  }
-
-  async _sync(src: string, dest: string): Promise<void> {
-    this.emit("start", { type: "sync" });
-
-    // Delete destination first (mirror)
-    await fs.remove(dest);
-    await fs.ensureDir(dest);
-
-    // Walk all files in src
-    const files = walkDir(src);
-    const totalSize = files.reduce((s, f) => s + f.size, 0);
-    let copiedSize = 0;
-
-    for (const file of files) {
-      const relative = path.relative(src, file.path);
-      const destination = path.join(dest, relative);
-
-      await fs.ensureDir(path.dirname(destination));
-
-      await new Promise<void>((resolve, reject) => {
-        const read = fs.createReadStream(file.path);
-        const write = fs.createWriteStream(destination);
-
-        read.on("data", (chunk: Buffer) => {
-          copiedSize += chunk.length;
-
-          this.emit("progress", {
-            copiedSize,
-            totalSize,
-            percent: Math.floor((copiedSize / totalSize) * 100),
-            currentFile: relative
-          });
-        });
-
-        read.on("error", (err) => {
-          this.emit("file-error", {
-            file: relative,
-            error: err.message
-          });
-          reject(err);
-        });
-
-        write.on("error", (err) => {
-          this.emit("file-error", {
-            file: relative,
-            error: err.message
-          });
-          reject(err);
-        });
-
-        write.on("finish", () => {
-          this.emit("file-success", {
-            file: relative,
-            copiedSize,
-            totalSize
-          });
-          resolve();
-        });
-
-        read.pipe(write);
-      });
+      }
     }
 
     this.emit("complete", { copiedSize, totalSize });
   }
+
+
+  async _sync(src: string, dest: string): Promise<void> {
+  const srcFiles = walkDir(src);
+  const srcMap = new Map(srcFiles.map(f => [path.relative(src, f.path), f]));
+
+  const destExists = await fs.pathExists(dest);
+  const oldDestFiles = destExists ? walkDir(dest) : [];
+  const oldDestSet = new Set(oldDestFiles.map(f =>
+    path.relative(dest, f.path)
+  ));
+
+  const totalSize = srcFiles.reduce((s, f) => s + f.size, 0);
+  let copiedSize = 0;
+
+  // Mirror delete
+  await fs.remove(dest);
+  await fs.ensureDir(dest);
+
+  for (const file of srcFiles) {
+    const relative = path.relative(src, file.path);
+    const destination = path.join(dest, relative);
+
+    try {
+      await fs.ensureDir(path.dirname(destination));
+      await fs.copy(file.path, destination);
+
+      copiedSize += file.size;
+
+      this.emit("progress", {
+        copiedSize,
+        totalSize,
+        percent: Math.floor((copiedSize / totalSize) * 100),
+        currentFile: relative
+      });
+
+      const status = oldDestSet.has(relative) ? "updated" : "copied";
+
+      this.emit(`file-${status}`, {
+        file: relative,
+        size: file.size
+      });
+
+      oldDestSet.delete(relative);
+
+    } catch (err: any) {
+      this.emit("file-error", {
+        file: relative,
+        error: err.message
+      });
+    }
+  }
+
+  // Remaining files were deleted
+  for (const deletedFile of oldDestSet) {
+    this.emit("file-deleted", {
+      file: deletedFile,
+      size: 0
+    });
+  }
+
+  this.emit("complete", { copiedSize, totalSize });
+}
+
+
 
 }

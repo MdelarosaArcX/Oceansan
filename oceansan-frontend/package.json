@@ -1,8 +1,8 @@
 {
   "name": "oceansan-frontend",
   "version": "0.0.1",
-  "description": "Oceansan File Copy",
-  "productName": "File Copy",
+  "description": "OceanSAN File Copy",
+  "productName": "OceanSAN",
   "author": "Michael <michael.dlrosa@arcxsolutions.com>",
   "type": "module",
   "private": true,
