@@ -6,6 +6,7 @@
   "type": "commonjs",
   "scripts": {
     "dev": "ts-node src/server.ts",
+    "dev:watch": "nodemon --watch 'src/**/*.ts' --exec npx ts-node src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js"
   },
@@ -28,6 +29,7 @@
     "@types/fs-extra": "^11.0.4",
     "@types/node": "^25.0.9",
     "@types/ws": "^8.18.1",
+    "nodemon": "^3.1.11",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   }

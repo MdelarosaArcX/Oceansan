@@ -11,8 +11,8 @@ type ProgressPayload = {
   status: string;
 };
 
-export function startCopy(from: string, to: string, type: string, jobId: string) {
-  return axios.post(`${API_URL}/copy/start`, { from, to, type, jobId });
+export function startCopy(from: string, to: string, type: string, jobId: string,name:string) {
+  return axios.post(`${API_URL}/copy/start`, { from, to, type, jobId,name });
 }
 
 export function connectProgress(

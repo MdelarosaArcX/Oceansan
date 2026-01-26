@@ -318,7 +318,7 @@ function shortenPath(path: string) {
 const store = useCopyStore();
 
 async function runJob(row: JobRow) {
-  await store.startCopy(row.id, row.from, row.to, row.type);
+  await store.startCopy(row.id,row.name, row.from, row.to, row.type);
   // Refresh table
   await fetchSchedules();
 }

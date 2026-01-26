@@ -1,11 +1,8 @@
 import cron from "node-cron";
-import fs from "fs-extra";
-import path from "path";
+import os from "os";
+
 import Schedule, { ISchedule } from "../models/Schedule";
-import ScheduleLogs from "../models/ScheduleLogs";
-import CopyService from "./copy.service";
 import { CopyRunnerService } from "./copy-runner.service";
-import mongoose from "mongoose";
 
 type Broadcaster = (data: unknown) => void;
 
@@ -18,10 +15,14 @@ class SchedulerService {
   }
 
   start() {
+    if (os.platform() !== "win32") {
+      throw new Error("Scheduler requires Windows (Robocopy)");
+    }
+
     cron.schedule("* * * * *", async () => {
       const now = new Date();
-      const hhmm = now.toTimeString().slice(0, 5); // HH:mm
-      const today = now.getDay(); // 0–6
+      const hhmm = now.toTimeString().slice(0, 5);
+      const today = now.getDay();
 
       const schedules = await Schedule.find({
         active: true,
@@ -36,19 +37,28 @@ class SchedulerService {
       }
     });
 
-    console.log("Scheduler running (day + time based)");
+    console.log("Scheduler running (robocopy-based)");
   }
 
   private async runSchedule(schedule: ISchedule) {
+    const id = schedule._id.toString();
+    this.running.add(id);
+
     const runner = new CopyRunnerService(this.broadcaster);
 
-    await runner.run({
-      scheduleId: schedule._id.toString(),
-      type: schedule.type,
-      name: schedule.sched_name,
-      source: schedule.src_path,
-      destination: schedule.dest_path,
-    });
+    try {
+      await runner.run({
+        scheduleId: id,
+        type: schedule.type,
+        name: schedule.sched_name,
+        source: schedule.src_path,
+        destination: schedule.dest_path,
+      });
+    } catch (err) {
+      console.error("Schedule execution failed:", err);
+    } finally {
+      this.running.delete(id);
+    }
 
     await Schedule.updateOne(
       { _id: schedule._id },
@@ -57,10 +67,9 @@ class SchedulerService {
           schedule.type === "archive"
             ? { last_archived: new Date() }
             : { last_sync: new Date() },
-      },
+      }
     );
   }
-
 }
 
 export default new SchedulerService();

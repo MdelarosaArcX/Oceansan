@@ -28,14 +28,14 @@ export const useCopyStore = defineStore('copy', {
         },
       );
     },
-    async startCopy(jobId: string, from: string, to: string, type: string) {
+    async startCopy(jobId: string,name: string, from: string, to: string, type: string) {
       this.running = true;
       this.runningJobId = jobId;
       this.percent = 0;
       this.currentFile = '';
       this.status = '';
 
-      await startCopy(from, to, type, jobId);
+      await startCopy(from, to, type, jobId,name);
     },
   },
 });
