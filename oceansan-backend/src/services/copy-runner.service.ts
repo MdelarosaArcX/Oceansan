@@ -7,13 +7,12 @@ import Schedule from "../models/Schedule";
 import { walkDir } from "../utils/fileWalker";
 import { ScheduleLogger } from "../utils/scheduler.logger";
 
-
 type Broadcaster = (data: unknown) => void;
 
 //SPEEDEMA
 class SpeedEMA {
   private value = 0;
-  constructor(private alpha = 0.2) { }
+  constructor(private alpha = 0.2) {}
 
   update(sample: number) {
     if (this.value === 0) {
@@ -32,11 +31,11 @@ export class CopyRunnerService {
     type,
     name,
     source,
-    destination
+    destination,
   }: {
-    scheduleId: string,
+    scheduleId: string;
     type: "archive" | "sync";
-    name: string,
+    name: string;
     source: string;
     destination: string;
   }) {
@@ -45,15 +44,25 @@ export class CopyRunnerService {
     const totalFiles = files.length;
     const totalBytes = files.reduce((s, f) => s + f.size, 0);
 
+    // const logDoc = await ScheduleLogs.create({
+    //   scheduleId,
+    //   type,
+    //   source,
+    //   destination,
+    //   startTime: new Date(),
+    //   totalFiles: 0,
+    //   totalSize: 0,
+    //   files: []
+    // });
     const logDoc = await ScheduleLogs.create({
       scheduleId,
       type,
       source,
       destination,
       startTime: new Date(),
-      totalFiles: 0,
-      totalSize: 0,
-      files: []
+      totalFiles, // ✅ use computed value
+      totalSize: totalBytes,
+      files: [],
     });
 
     let copiedFiles = 0;
@@ -81,12 +90,13 @@ export class CopyRunnerService {
       type: "start",
       totalFiles,
       totalBytes,
-      startedAt
+      startedAt,
     });
 
-    copier.on("file-copied", ({ file, size }) => {
+    for (const f of files) {
+      // copier.on("file-copied", ({ file, size }) => {
       copiedFiles++;
-      copiedBytes += size;
+      copiedBytes += f.size;
 
       const now = Date.now();
       const deltaBytes = copiedBytes - lastBytes;
@@ -100,12 +110,13 @@ export class CopyRunnerService {
         ? Math.min(100, Math.floor((copiedFiles / totalFiles) * 100))
         : 0;
       const remainingBytes = totalBytes - copiedBytes;
-      const etaSeconds = smoothSpeed > 0 ? Math.floor(remainingBytes / smoothSpeed) : null;
+      const etaSeconds =
+        smoothSpeed > 0 ? Math.floor(remainingBytes / smoothSpeed) : null;
 
       // WS progress
       this.ws?.({
         type: "progress",
-        currentFile: file, // full path
+        currentFile: f, // full path
         filesCopied: copiedFiles,
         totalFiles,
         bytesCopied: copiedBytes,
@@ -113,18 +124,22 @@ export class CopyRunnerService {
         percent,
         speedBps: Math.floor(smoothSpeed),
         rawSpeedBps: Math.floor(rawSpeed),
-        etaSeconds
+        etaSeconds,
       });
 
       // buffer the file log
-      pendingFiles.push({ path: file, size, status: "copied" });
+      // pendingFiles.push({ path: file, size, status: "copied" });
+      pendingFiles.push({
+        path: f.path,
+        size: f.size,
+        status: "copied",
+      });
 
       // schedule flush
       if (!saveTimeout) {
         saveTimeout = setTimeout(flushLogs, 200); // batch save every 200ms
       }
-    });
-
+    }
     copier.on("file-deleted", ({ file }) => {
       pendingFiles.push({ path: file, size: 0, status: "deleted" });
       if (!saveTimeout) {
@@ -150,14 +165,14 @@ export class CopyRunnerService {
         totalFiles,
         totalBytes,
         averageSpeedBps: Math.floor(avgSpeed),
-        durationSeconds
+        durationSeconds,
       });
     });
 
     copier.on("error", (err) => {
       this.ws?.({
         type: "error",
-        message: err.message
+        message: err.message,
       });
     });
 

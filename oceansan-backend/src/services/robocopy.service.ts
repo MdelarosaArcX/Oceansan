@@ -1,17 +1,15 @@
 import { EventEmitter } from "events";
 import { spawn } from "child_process";
 import os from "os";
-import path from "path";
 import { walkDir } from "../utils/fileWalker";
 
-
-
 export default class RobocopyService extends EventEmitter {
-
   private ensureWindows() {
+    console.log("[robocopy] checking OS...");
     if (os.platform() !== "win32") {
       throw new Error("Robocopy is only supported on Windows");
     }
+    console.log("[robocopy] Windows OK");
   }
 
   /* ============================
@@ -20,20 +18,20 @@ export default class RobocopyService extends EventEmitter {
   async archive(src: string, dest: string): Promise<void> {
     this.ensureWindows();
 
+    console.log("[robocopy][archive] SRC :", src);
+    console.log("[robocopy][archive] DEST:", dest);
+
     const files = walkDir(src);
     const totalSize = files.reduce((s, f) => s + f.size, 0);
 
-    const fileSizeMap = new Map(
-      files.map(f => [
-        path.normalize(path.resolve(f.path)).toLowerCase(),
-        f.size
-      ])
-    );
+    console.log("[robocopy][archive] total files:", files.length);
+    console.log("[robocopy][archive] total size :", totalSize);
 
     this.emit("start", {
       totalFiles: files.length,
-      totalSize
+      totalSize,
     });
+
     const args = [
       src,
       dest,
@@ -42,105 +40,139 @@ export default class RobocopyService extends EventEmitter {
       "/R:2",
       "/W:1",
       "/MT:8",
-      "/TEE"
+      "/TEE",
+      "/BYTES",
+      "/FP",
     ];
-    console.log("running robo copy?")
-    await this.runRobocopy(src, args, fileSizeMap);
+
+    console.log("[robocopy][archive] CMD:");
+    console.log("robocopy", args.join(" "));
+
+    await this.runRobocopy("archive", args, totalSize);
   }
 
   /* ============================
      SYNC / MIRROR
      ============================ */
-
   async sync(src: string, dest: string): Promise<void> {
     this.ensureWindows();
+
+    console.log("[robocopy][sync] SRC :", src);
+    console.log("[robocopy][sync] DEST:", dest);
+
+    this.emit("start", {
+      totalFiles: 0,
+      totalSize: 0,
+    });
 
     const args = [
       src,
       dest,
-      "/E",
+      "/MIR",
       "/Z",
       "/R:2",
       "/W:1",
-      "/MT:8",   // lower threads = cleaner output
-      "/TEE"
+      "/MT:8",
+      "/TEE",
+      "/BYTES",
+      "/FP",
     ];
 
-    this.emit("start", {
-      totalFiles: 0,
-      totalSize: 0
-    });
+    console.log("[robocopy][sync] CMD:");
+    console.log("robocopy", args.join(" "));
 
-    await this.runRobocopy(src, args, new Map());
+    await this.runRobocopy("sync", args, 0);
   }
 
   /* ============================
      CORE RUNNER
      ============================ */
   private runRobocopy(
-    src: string,
+    mode: "archive" | "sync",
     args: string[],
-    fileSizeMap: Map<string, number>
+    totalSize: number,
   ): Promise<void> {
     return new Promise((resolve, reject) => {
-      const proc = spawn("robocopy", args, { shell: true });
+      console.log(`[robocopy][${mode}] spawning process...`);
+      const proc = spawn("robocopy", args, { shell: false });
 
-      // console.log(proc,"proc")
       let copiedSize = 0;
 
-      proc.stdout.on("data", (data: Buffer) => {
-        const lines = data.toString().split(/\r?\n/);
-        console.log("data", data)
-        for (const line of lines) {
+      const FILE_RE = /^(New File|Updated)\s+(\d+)\s+(.+)$/i;
+      const SPEED_RE = /Speed\s+:\s+([\d,]+)\s+Bytes\/sec/i;
 
+      proc.stdout.on("data", (data: Buffer) => {
+        console.log("========== RAW STDOUT ==========");
+        console.log(data.toString());
+        console.log("================================");
+
+        const lines = data.toString().split(/\r?\n/);
+
+        for (const line of lines) {
           const text = line.trim();
           if (!text) continue;
 
-          console.log(text, "text")
-         
+          console.log(`[robocopy][${mode}][line]:`, text);
 
-
-          // const FILE_RE = /New File\s+.+?\s+(?:[kKmMgG])\s+(.+)$/;
-
-          // New / Updated file
-          if (/^(New File|Updated)/i.test(text)) {
-            // const match = text.match(FILE_RE);
-            // if (!match) return;
-             const file = text.split(/\s+/).slice(2).join(" ");
-
-            const fullPath = text[1].trim();
-            const absPath = path.normalize(path.resolve(fullPath)).toLowerCase();
-            const size = fileSizeMap.get(absPath) ?? 0;
-
-
-            console.log(size, "size")
+          // --- FILE COPIED / UPDATED ---
+          const fileMatch = text.match(FILE_RE);
+          if (fileMatch) {
+            const size = parseInt(fileMatch[2], 10);
+            const file = fileMatch[3];
 
             copiedSize += size;
+
+            console.log(`[robocopy][${mode}] FILE:`, file);
+            console.log(`[robocopy][${mode}] SIZE:`, size);
+            console.log(`[robocopy][${mode}] COPIED:`, copiedSize);
+
             this.emit("progress", {
               copiedSize,
-              totalSize: Array.from(fileSizeMap.values()).reduce((a, b) => a + b, 0),
-              currentFile: fullPath
+              totalSize,
+              currentFile: file,
             });
 
-            this.emit("file-copied", {
-              file: absPath,
-              size
+            this.emit("file-copied", { file, size });
+            continue;
+          }
+
+          // --- SPEED ---
+          const speedMatch = text.match(SPEED_RE);
+          if (speedMatch) {
+            const bytesPerSec = parseInt(speedMatch[1].replace(/,/g, ""), 10);
+
+            console.log(`[robocopy][${mode}] SPEED B/s:`, bytesPerSec);
+
+            this.emit("speed", {
+              kbps: bytesPerSec / 1024,
+              mbps: bytesPerSec / 1024 / 1024,
             });
           }
 
-          if (/^\*EXTRA File/i.test(text)) {
+          // --- DELETE (sync) ---
+          if (mode === "sync" && /^\*EXTRA File/i.test(text)) {
             const file = text.replace(/^\*EXTRA File\s+/i, "");
+            console.log(`[robocopy][sync] DELETED:`, file);
             this.emit("file-deleted", { file, size: 0 });
           }
         }
       });
 
+      proc.stderr.on("data", (data: Buffer) => {
+        console.error("========== STDERR ==========");
+        console.error(data.toString());
+        console.error("============================");
+      });
 
       proc.on("close", (code) => {
+        console.log(`[robocopy][${mode}] EXIT CODE:`, code);
+        console.log(`[robocopy][${mode}] COPIED:`, copiedSize);
+        console.log(`[robocopy][${mode}] TOTAL:`, totalSize);
+
         if (code !== null && code <= 7) {
           this.emit("complete", {
             copiedSize,
-            totalSize: Array.from(fileSizeMap.values()).reduce((a, b) => a + b, 0)
+            totalSize,
           });
           resolve();
         } else {
@@ -149,6 +181,4 @@ export default class RobocopyService extends EventEmitter {
       });
     });
   }
-
 }
-
