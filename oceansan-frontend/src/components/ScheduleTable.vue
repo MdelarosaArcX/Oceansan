@@ -15,6 +15,7 @@
         @click="openCreate"
         no-caps
       />
+       {{ store }}
     </q-card-section>
 
     <q-separator />
@@ -55,7 +56,10 @@
       <!-- Status column -->
       <template #body-cell-status="props">
         <q-td :props="props">
-          <div v-if="store.runningJobId !== props.row.id" class="status-cell">
+          <div>
+           
+          </div>
+          <div v-if="store.runningJobId !== props.row.id && store.type !== 'complete'" class="status-cell">
             <q-chip dense rounded :color="statusColor(props.value)" text-color="white">
               {{ props.value }}
             </q-chip>
@@ -71,7 +75,7 @@
               color="primary"
             />
             <div class="text-caption text-grey q-mt-xs ellipsis">
-              {{ store.percent }}% — {{ store.currentFile }}
+              {{ store.speed }} — {{ store.currentFile }} ({{ store.ratio }})<br>
             </div>
           </div>
         </q-td>
