@@ -3,7 +3,13 @@ import { spawn } from "child_process";
 import os from "os";
 import { walkDir } from "../utils/fileWalker";
 
+type Broadcaster = (data: unknown) => void;
+
 export default class RobocopyService extends EventEmitter {
+  constructor(private ws?: Broadcaster) {
+    super();
+    console.log("WS injected:", !!ws);
+  }
   private ensureWindows() {
     console.log("[robocopy] checking OS...");
     if (os.platform() !== "win32") {
@@ -17,6 +23,8 @@ export default class RobocopyService extends EventEmitter {
      ============================ */
   async archive(src: string, dest: string): Promise<void> {
     this.ensureWindows();
+
+    const PERCENT_RE = /^(\d+)%$/;
 
     console.log("[robocopy][archive] SRC :", src);
     console.log("[robocopy][archive] DEST:", dest);
@@ -48,7 +56,8 @@ export default class RobocopyService extends EventEmitter {
     console.log("[robocopy][archive] CMD:");
     console.log("robocopy", args.join(" "));
 
-    await this.runRobocopy("archive", args, totalSize);
+    // await this.runRobocopy("archive", args, totalSize);
+    await this.runRobocopy("archive", args, totalSize, files.length);
   }
 
   /* ============================
@@ -81,7 +90,9 @@ export default class RobocopyService extends EventEmitter {
     console.log("[robocopy][sync] CMD:");
     console.log("robocopy", args.join(" "));
 
-    await this.runRobocopy("sync", args, 0);
+    // await this.runRobocopy("sync", args, 0);
+    const files = walkDir(src);
+    await this.runRobocopy("sync", args, 0, files.length);
   }
 
   /* ============================
@@ -91,8 +102,12 @@ export default class RobocopyService extends EventEmitter {
     mode: "archive" | "sync",
     args: string[],
     totalSize: number,
+    totalFiles: number,
   ): Promise<void> {
     return new Promise((resolve, reject) => {
+      let copiedFiles = 0;
+      // let totalFiles = 0;
+
       console.log(`[robocopy][${mode}] spawning process...`);
       const proc = spawn("robocopy", args, { shell: false });
 
@@ -104,6 +119,16 @@ export default class RobocopyService extends EventEmitter {
       proc.stdout.on("data", (data: Buffer) => {
         console.log("========== RAW STDOUT ==========");
         console.log(data.toString());
+        const raw = data.toString();
+        const percentMatch = raw.match(/(\d+)%/);
+
+        if (percentMatch) {
+          const percent = parseInt(percentMatch[1], 10);
+          this.ws?.({
+            type: "percentage",
+            percent, // number only
+          });
+        }
         console.log("================================");
 
         const lines = data.toString().split(/\r?\n/);
@@ -125,11 +150,23 @@ export default class RobocopyService extends EventEmitter {
             console.log(`[robocopy][${mode}] FILE:`, file);
             console.log(`[robocopy][${mode}] SIZE:`, size);
             console.log(`[robocopy][${mode}] COPIED:`, copiedSize);
+            const percent = totalSize
+              ? Math.min(100, Math.floor((copiedSize / totalSize) * 100))
+              : 0;
 
             this.emit("progress", {
               copiedSize,
               totalSize,
               currentFile: file,
+              percent,
+            });
+
+            // SEND WS PROGRESS
+            copiedFiles++;
+
+            this.ws?.({
+              type: "ratio",
+              ratio: `${copiedFiles}/${totalFiles}`,
             });
 
             this.emit("file-copied", { file, size });

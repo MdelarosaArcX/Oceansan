@@ -39,38 +39,61 @@ export class CopyRunnerService {
     source: string;
     destination: string;
   }) {
-    const copier = new RobocopyService();
+    let currentFile = "";
+    let currentStatus: "copying" | "deleted" | "idle" = "idle";
+
+    const copier = new RobocopyService(this.ws);
+
     const files = walkDir(source);
     const totalFiles = files.length;
     const totalBytes = files.reduce((s, f) => s + f.size, 0);
 
-    // const logDoc = await ScheduleLogs.create({
-    //   scheduleId,
-    //   type,
-    //   source,
-    //   destination,
-    //   startTime: new Date(),
-    //   totalFiles: 0,
-    //   totalSize: 0,
-    //   files: []
-    // });
     const logDoc = await ScheduleLogs.create({
       scheduleId,
       type,
       source,
       destination,
       startTime: new Date(),
-      totalFiles, // ✅ use computed value
+      totalFiles,
       totalSize: totalBytes,
       files: [],
     });
 
     let copiedFiles = 0;
     let copiedBytes = 0;
+
     let lastBytes = 0;
     let lastTime = Date.now();
+
     const ema = new SpeedEMA(0.15);
     const startedAt = Date.now();
+
+    // --- Real-time speed emitter ---
+    const emitSpeed = () => {
+      const now = Date.now();
+      const deltaBytes = copiedBytes - lastBytes;
+      const deltaTime = (now - lastTime) / 1000 || 1;
+      const rawSpeed = deltaBytes / deltaTime;
+      const smoothSpeed = ema.update(rawSpeed);
+
+      lastBytes = copiedBytes;
+      lastTime = now;
+
+      const percent = totalBytes
+        ? Math.min(100, Math.floor((copiedBytes / totalBytes) * 100))
+        : 0;
+
+      const speed = formatSpeed(smoothSpeed);
+
+      this.ws?.({
+        type: "progress",
+        currentFile,
+        speed: speed.value.toFixed(2) + " " + speed.unit,
+        scheduleId,
+      });
+    };
+
+    const speedInterval = setInterval(emitSpeed, 500);
 
     // Buffer to batch save
     const pendingFiles: ILogsFile[] = [];
@@ -93,11 +116,14 @@ export class CopyRunnerService {
       startedAt,
     });
 
-    for (const f of files) {
-      // copier.on("file-copied", ({ file, size }) => {
-      copiedFiles++;
-      copiedBytes += f.size;
+    copier.on("file-copied", ({ file, size }) => {
+      currentFile = path.basename(file); // <-- NEW
+      currentStatus = "copying";
 
+      copiedFiles++;
+      copiedBytes += size;
+
+      // speed calculation
       const now = Date.now();
       const deltaBytes = copiedBytes - lastBytes;
       const deltaTime = (now - lastTime) / 1000 || 1;
@@ -106,52 +132,69 @@ export class CopyRunnerService {
       lastBytes = copiedBytes;
       lastTime = now;
 
-      const percent = totalFiles
-        ? Math.min(100, Math.floor((copiedFiles / totalFiles) * 100))
+      // percent
+      const percent = totalBytes
+        ? Math.min(100, Math.floor((copiedBytes / totalBytes) * 100))
         : 0;
-      const remainingBytes = totalBytes - copiedBytes;
-      const etaSeconds =
-        smoothSpeed > 0 ? Math.floor(remainingBytes / smoothSpeed) : null;
 
-      // WS progress
+      const speed = formatSpeed(smoothSpeed);
+
+      // send a single progress websocket event
+      // this.ws?.({
+      //   type: "progress",
+      //   currentFile: file,
+      //   status: "copying",
+      //   percent,
+      //   speed: speed.value.toFixed(2) + " " + speed.unit,
+      //   bytesCopied: copiedBytes,
+      //   totalBytes,
+      //   filesCopied: copiedFiles,
+      //   totalFiles,
+      // });
+
       this.ws?.({
-        type: "progress",
-        currentFile: f, // full path
-        filesCopied: copiedFiles,
-        totalFiles,
-        bytesCopied: copiedBytes,
-        totalBytes,
-        percent,
-        speedBps: Math.floor(smoothSpeed),
-        rawSpeedBps: Math.floor(rawSpeed),
-        etaSeconds,
+        type: "progress 123",
+        currentFile: file,
+        speed: speed.value.toFixed(2) + " " + speed.unit,
+        scheduleId,
       });
 
-      // buffer the file log
-      // pendingFiles.push({ path: file, size, status: "copied" });
-      pendingFiles.push({
-        path: f.path,
-        size: f.size,
-        status: "copied",
-      });
+      pendingFiles.push({ path: file, size, status: "copied" });
 
-      // schedule flush
       if (!saveTimeout) {
-        saveTimeout = setTimeout(flushLogs, 200); // batch save every 200ms
+        saveTimeout = setTimeout(flushLogs, 200);
       }
-    }
+    });
+
     copier.on("file-deleted", ({ file }) => {
+      currentFile = path.basename(file);
+      currentStatus = "deleted";
+
       pendingFiles.push({ path: file, size: 0, status: "deleted" });
+      // percent
+      const percent = totalBytes
+        ? Math.min(100, Math.floor((copiedBytes / totalBytes) * 100))
+        : 0;
+
+      // this.ws?.({
+      //   type: "progress",
+      //   currentFile: file,
+      //   status: "deleted",
+      //   percent,
+      //   speedBps: 0,
+      //   bytesCopied: copiedBytes,
+      //   totalBytes,
+      //   filesCopied: copiedFiles,
+      //   totalFiles,
+      // });
       if (!saveTimeout) {
         saveTimeout = setTimeout(flushLogs, 200);
       }
     });
 
     copier.on("complete", async () => {
-      // flush remaining logs
-      if (saveTimeout) {
-        clearTimeout(saveTimeout);
-      }
+      clearInterval(speedInterval);
+      if (saveTimeout) clearTimeout(saveTimeout);
       await flushLogs();
 
       logDoc.endTime = new Date();
@@ -164,12 +207,14 @@ export class CopyRunnerService {
         type: "complete",
         totalFiles,
         totalBytes,
+        scheduleId,
         averageSpeedBps: Math.floor(avgSpeed),
         durationSeconds,
       });
     });
 
     copier.on("error", (err) => {
+      clearInterval(speedInterval);
       this.ws?.({
         type: "error",
         message: err.message,
@@ -180,6 +225,19 @@ export class CopyRunnerService {
       await copier.archive(source, destination);
     } else {
       await copier.sync(source, destination);
+    }
+
+    function formatSpeed(bytesPerSec: number) {
+      if (bytesPerSec >= 1024 ** 3) {
+        return { value: bytesPerSec / 1024 ** 3, unit: "GB/s" };
+      }
+      if (bytesPerSec >= 1024 ** 2) {
+        return { value: bytesPerSec / 1024 ** 2, unit: "MB/s" };
+      }
+      if (bytesPerSec >= 1024) {
+        return { value: bytesPerSec / 1024, unit: "KB/s" };
+      }
+      return { value: bytesPerSec, unit: "B/s" };
     }
   }
 }
