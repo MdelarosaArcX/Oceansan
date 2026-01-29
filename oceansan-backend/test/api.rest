@@ -70,7 +70,7 @@ GET {{host}}/api/schedulesLogs?page=1&rowsPerPage=3&sortBy=createdAt&descending=
 POST {{host}}/copy/start
 {{json}}
 
-{"from":"C:/Users/tamid/OneDrive/Desktop/EVFSource","to":"C:/Users/tamid/OneDrive/Desktop/SCHTarget","type":"sync","jobId":"697038e237ef6e91b5d3191d","name":"name"}
+{"from":"C:/Users/tamid/OneDrive/Desktop/bk-src","to":"C:/Users/tamid/OneDrive/Desktop/bk-trgt","type":"sync","jobId":"697aabb1cac89cab0999e811","name":"sync-rec","recycle":true,"recycle_path":"C:/Users/tamid/OneDrive/Desktop/bk-del"}
 
 
 

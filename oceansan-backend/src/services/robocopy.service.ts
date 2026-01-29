@@ -2,6 +2,8 @@ import { EventEmitter } from "events";
 import { spawn } from "child_process";
 import os from "os";
 import { walkDir } from "../utils/fileWalker";
+import fs from "fs-extra";
+import path from "path";
 
 type Broadcaster = (data: unknown) => void;
 
@@ -63,7 +65,11 @@ export default class RobocopyService extends EventEmitter {
   /* ============================
      SYNC / MIRROR
      ============================ */
-  async sync(src: string, dest: string, opts?: { recycle: boolean }): Promise<void> {
+  async sync(
+    src: string,
+    dest: string,
+    opts?: { recycle: boolean; recycle_path: string }
+  ): Promise<void> {
     this.ensureWindows();
 
     console.log("[robocopy][sync] SRC :", src);
@@ -74,10 +80,56 @@ export default class RobocopyService extends EventEmitter {
       totalSize: 0,
     });
 
+    console.log(opts,"OPTIONS")
+    /* ======================================================
+       1️⃣ PRE-SCAN FOR SOFT DELETE (DEST - SRC)
+       ====================================================== */
+    if (opts?.recycle) {
+      console.log("[robocopy][sync] soft-delete enabled");
+
+      const srcFiles = walkDir(src);
+      const destFiles = walkDir(dest);
+
+      // build source lookup using relative paths
+      const srcSet = new Set(
+        srcFiles.map(f =>
+          path.relative(src, f.path).replace(/\\/g, "/")
+        )
+      );
+
+      for (const f of destFiles) {
+        const rel = path
+          .relative(dest, f.path)
+          .replace(/\\/g, "/");
+
+        // skip invalid paths
+        if (!rel || rel.startsWith("..")) continue;
+
+        // exists in DEST but NOT in SRC => recycle it
+        if (!srcSet.has(rel)) {
+          const target = path.join(opts.recycle_path, rel);
+          console.log(target,"TARGETSDSADSDAS")
+          console.log("[robocopy][sync] RECYCLE:", f.path);
+
+          await fs.ensureDir(path.dirname(target));
+          await fs.move(f.path, target, { overwrite: true });
+
+          this.emit("file-recycled", {
+            file: f.path,
+            target,
+            size: f.size,
+          });
+        }
+      }
+    }
+
+    /* ======================================================
+       2️ RUN ROBOCOPY (COPY ONLY)
+       ====================================================== */
     const args = [
       src,
       dest,
-      "/E",          // copy only
+      "/E",
       "/Z",
       "/R:2",
       "/W:1",
@@ -87,7 +139,7 @@ export default class RobocopyService extends EventEmitter {
       "/FP",
     ];
 
-    // ONLY hard delete uses /MIR
+    // ONLY hard-delete mode uses /MIR
     if (!opts?.recycle) {
       args.push("/MIR");
     }
@@ -95,7 +147,6 @@ export default class RobocopyService extends EventEmitter {
     console.log("[robocopy][sync] CMD:");
     console.log("robocopy", args.join(" "));
 
-    // await this.runRobocopy("sync", args, 0);
     const files = walkDir(src);
     await this.runRobocopy("sync", args, 0, files.length);
   }

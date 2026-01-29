@@ -175,34 +175,31 @@ export class CopyRunnerService {
       await fs.move(file, target, { overwrite: true });
     };
 
-    // SOFT DELETE 
-    if (type === "sync" && option?.recycle) {
-      copier.on("file-extra", async ({ file }) => {
+
+
+    copier.on("file-deleted", async ({ file }) => {
+      currentFile = path.basename(file);
+      currentStatus = "deleted";
+      console.log(file,"deleted file")
+
+      if (option?.recycle) {
+        // soft delete
         await moveToDeletePath(file);
         this.ws?.({
           type: "deleted",
           mode: "soft",
           file,
         });
-      });
-    }
-    // last here
-
-    copier.on("file-deleted", ({ file }) => {
-      if (option?.recycle) return; // skip, already handled in soft-delete
-      currentFile = path.basename(file);
-      currentStatus = "deleted";
-
-      pendingFiles.push({ path: file, size: 0, status: "deleted" });
-      // percent
-      const percent = totalBytes
-        ? Math.min(100, Math.floor((copiedBytes / totalBytes) * 100))
-        : 0;
+      } else {
+        // hard delete
+        pendingFiles.push({ path: file, size: 0, status: "deleted" });
+      }
 
       if (!saveTimeout) {
         saveTimeout = setTimeout(flushLogs, 200);
       }
     });
+
 
     copier.on("complete", async () => {
       clearInterval(speedInterval);
@@ -236,7 +233,7 @@ export class CopyRunnerService {
     if (type === "archive") {
       await copier.archive(source, destination);
     } else {
-      await copier.sync(source, destination);
+      await copier.sync(source, destination,option);
     }
 
     function formatSpeed(bytesPerSec: number) {
