@@ -254,6 +254,7 @@ function openCreate() {
 }
 
 function openEdit(row: JobRow) {
+  console.log(row,"jobbbasdasd")
   selectedSchedule.value = {
     id: row.id,
     name: row.name,
@@ -320,7 +321,8 @@ function shortenPath(path: string) {
 const store = useCopyStore();
 
 async function runJob(row: JobRow) {
-  await store.startCopy(row.id, row.name, row.from, row.to, row.type);
+  console.log(row,"asdasdsa")
+  await store.startCopy(row.id, row.name, row.from, row.to, row.type,row.recycle,row.recycle_path);
   // Refresh table
   await fetchSchedules();
 }

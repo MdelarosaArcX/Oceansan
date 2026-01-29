@@ -36,14 +36,14 @@ export const useCopyStore = defineStore('copy', {
         },
       );
     },
-    async startCopy(jobId: string, name: string, from: string, to: string, type: string) {
+    async startCopy(jobId: string, name: string, from: string, to: string, type: string, recycle: boolean, recycle_path: string) {
       this.running = true;
       this.runningJobId = jobId;
       this.percent = 0;
       this.currentFile = '';
       this.type = '';
-
-      await startCopy(from, to, type, jobId, name);
+      // console.log(from, to, type, jobId, name, recycle, recycle_path,"ccccc")
+      await startCopy(from, to, type, jobId, name, recycle, recycle_path);
     },
   },
 });
