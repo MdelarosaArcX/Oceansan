@@ -10,6 +10,10 @@ export const useCopyStore = defineStore('copy', {
     type: '',
     speed: '',
     ratio: '',
+    freeGB: '',
+    heapUsedMB: '',
+    heapTotalMB: '',
+    rssMB: '',
   }),
 
   actions: {
@@ -34,6 +38,12 @@ export const useCopyStore = defineStore('copy', {
         (p) => {
           this.ratio = p.ratio;
         },
+        (p, gb) => {
+          this.freeGB = gb;
+          this.heapUsedMB = p.heapUsedMB;
+          this.heapTotalMB = p.heapTotalMB;
+          this.rssMB = p.rssMB;
+        },
       );
     },
     async startCopy(jobId: string, name: string, from: string, to: string, type: string, recycle: boolean, recycle_path: string) {
@@ -42,7 +52,6 @@ export const useCopyStore = defineStore('copy', {
       this.percent = 0;
       this.currentFile = '';
       this.type = '';
-      // console.log(from, to, type, jobId, name, recycle, recycle_path,"ccccc")
       await startCopy(from, to, type, jobId, name, recycle, recycle_path);
     },
   },

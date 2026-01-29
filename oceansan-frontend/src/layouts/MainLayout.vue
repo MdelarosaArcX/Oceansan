@@ -10,6 +10,14 @@
 
         <q-space />
 
+        <q-chip dense rounded color="info" text-color="white">
+          Heap Total: {{ store.heapTotalMB }} MB
+        </q-chip>
+
+        <q-chip dense rounded color="info" text-color="white">
+          Available RAM: {{ store.freeGB }} GB
+        </q-chip>
+
         <!-- Dark mode toggle -->
         <q-btn flat round dense icon="notifications"> </q-btn>
         <q-btn flat round dense :icon="isDark ? 'dark_mode' : 'light_mode'" @click="toggleDark">
@@ -75,6 +83,7 @@ import { ref } from 'vue';
 import { Dark } from 'quasar';
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
+import { useCopyStore } from 'src/stores/copy.store';
 
 const isDark = computed(() => Dark.isActive);
 
@@ -82,6 +91,8 @@ function toggleDark() {
   Dark.toggle();
   localStorage.setItem('dark-mode', String(Dark.isActive));
 }
+
+const store = useCopyStore();
 
 const drawer = ref(false);
 const menuList = [
@@ -107,7 +118,7 @@ const menuList = [
 const route = useRoute();
 
 const activeMenu = computed(() => {
-  const current = menuList.find(item => item.to === route.path);
+  const current = menuList.find((item) => item.to === route.path);
   return current?.label ?? '';
 });
 </script>
