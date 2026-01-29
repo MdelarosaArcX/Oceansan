@@ -8,14 +8,14 @@ type Broadcaster = (data: unknown) => void;
 export default class RobocopyService extends EventEmitter {
   constructor(private ws?: Broadcaster) {
     super();
-    console.log("WS injected:", !!ws);
+    // console.log("WS injected:", !!ws);
   }
   private ensureWindows() {
-    console.log("[robocopy] checking OS...");
+    // console.log("[robocopy] checking OS...");
     if (os.platform() !== "win32") {
       throw new Error("Robocopy is only supported on Windows");
     }
-    console.log("[robocopy] Windows OK");
+    // console.log("[robocopy] Windows OK");
   }
 
   /* ============================
@@ -26,14 +26,8 @@ export default class RobocopyService extends EventEmitter {
 
     const PERCENT_RE = /^(\d+)%$/;
 
-    console.log("[robocopy][archive] SRC :", src);
-    console.log("[robocopy][archive] DEST:", dest);
-
     const files = walkDir(src);
     const totalSize = files.reduce((s, f) => s + f.size, 0);
-
-    console.log("[robocopy][archive] total files:", files.length);
-    console.log("[robocopy][archive] total size :", totalSize);
 
     this.emit("start", {
       totalFiles: files.length,
@@ -47,14 +41,12 @@ export default class RobocopyService extends EventEmitter {
       "/Z",
       "/R:2",
       "/W:1",
-      "/MT:8",
+      "/MT:1",
+      // "/MT:8", This means multiple files copy in parallel. There is no such thing as “current file” anymore — there are 8 files copying.
       "/TEE",
       "/BYTES",
       "/FP",
     ];
-
-    console.log("[robocopy][archive] CMD:");
-    console.log("robocopy", args.join(" "));
 
     // await this.runRobocopy("archive", args, totalSize);
     await this.runRobocopy("archive", args, totalSize, files.length);
@@ -63,11 +55,8 @@ export default class RobocopyService extends EventEmitter {
   /* ============================
      SYNC / MIRROR
      ============================ */
-  async sync(src: string, dest: string, opts?: { recycle: boolean }): Promise<void> {
+  async sync(src: string, dest: string): Promise<void> {
     this.ensureWindows();
-
-    console.log("[robocopy][sync] SRC :", src);
-    console.log("[robocopy][sync] DEST:", dest);
 
     this.emit("start", {
       totalFiles: 0,
@@ -77,7 +66,7 @@ export default class RobocopyService extends EventEmitter {
     const args = [
       src,
       dest,
-      "/E",          // copy only
+      "/MIR",
       "/Z",
       "/R:2",
       "/W:1",
@@ -87,13 +76,6 @@ export default class RobocopyService extends EventEmitter {
       "/FP",
     ];
 
-    // ONLY hard delete uses /MIR
-    if (!opts?.recycle) {
-      args.push("/MIR");
-    }
-
-    console.log("[robocopy][sync] CMD:");
-    console.log("robocopy", args.join(" "));
 
     // await this.runRobocopy("sync", args, 0);
     const files = walkDir(src);
@@ -110,10 +92,9 @@ export default class RobocopyService extends EventEmitter {
     totalFiles: number,
   ): Promise<void> {
     return new Promise((resolve, reject) => {
-      let copiedFiles = 0;
+      let copiedFiles = 1;
       // let totalFiles = 0;
 
-      console.log(`[robocopy][${mode}] spawning process...`);
       const proc = spawn("robocopy", args, { shell: false });
 
       let copiedSize = 0;
@@ -122,8 +103,6 @@ export default class RobocopyService extends EventEmitter {
       const SPEED_RE = /Speed\s+:\s+([\d,]+)\s+Bytes\/sec/i;
 
       proc.stdout.on("data", (data: Buffer) => {
-        console.log("========== RAW STDOUT ==========");
-        console.log(data.toString());
         const raw = data.toString();
         const percentMatch = raw.match(/(\d+)%/);
 
@@ -134,7 +113,6 @@ export default class RobocopyService extends EventEmitter {
             percent, // number only
           });
         }
-        console.log("================================");
 
         const lines = data.toString().split(/\r?\n/);
 
@@ -142,7 +120,6 @@ export default class RobocopyService extends EventEmitter {
           const text = line.trim();
           if (!text) continue;
 
-          console.log(`[robocopy][${mode}][line]:`, text);
 
           // --- FILE COPIED / UPDATED ---
           const fileMatch = text.match(FILE_RE);
@@ -152,9 +129,6 @@ export default class RobocopyService extends EventEmitter {
 
             copiedSize += size;
 
-            console.log(`[robocopy][${mode}] FILE:`, file);
-            console.log(`[robocopy][${mode}] SIZE:`, size);
-            console.log(`[robocopy][${mode}] COPIED:`, copiedSize);
             const percent = totalSize
               ? Math.min(100, Math.floor((copiedSize / totalSize) * 100))
               : 0;
@@ -165,14 +139,14 @@ export default class RobocopyService extends EventEmitter {
               currentFile: file,
               percent,
             });
-
-            // SEND WS PROGRESS
             copiedFiles++;
 
             this.ws?.({
               type: "ratio",
               ratio: `${copiedFiles}/${totalFiles}`,
             });
+            // SEND WS PROGRESS
+            
 
             this.emit("file-copied", { file, size });
             continue;
@@ -183,7 +157,6 @@ export default class RobocopyService extends EventEmitter {
           if (speedMatch) {
             const bytesPerSec = parseInt(speedMatch[1].replace(/,/g, ""), 10);
 
-            console.log(`[robocopy][${mode}] SPEED B/s:`, bytesPerSec);
 
             this.emit("speed", {
               kbps: bytesPerSec / 1024,
@@ -194,7 +167,6 @@ export default class RobocopyService extends EventEmitter {
           // --- DELETE (sync) ---
           if (mode === "sync" && /^\*EXTRA File/i.test(text)) {
             const file = text.replace(/^\*EXTRA File\s+/i, "");
-            console.log(`[robocopy][sync] DELETED:`, file);
             this.emit("file-deleted", { file, size: 0 });
           }
         }
@@ -207,10 +179,6 @@ export default class RobocopyService extends EventEmitter {
       });
 
       proc.on("close", (code) => {
-        console.log(`[robocopy][${mode}] EXIT CODE:`, code);
-        console.log(`[robocopy][${mode}] COPIED:`, copiedSize);
-        console.log(`[robocopy][${mode}] TOTAL:`, totalSize);
-
         if (code !== null && code <= 7) {
           this.emit("complete", {
             copiedSize,
