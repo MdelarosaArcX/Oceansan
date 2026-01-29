@@ -12,7 +12,7 @@ type Broadcaster = (data: unknown) => void;
 //SPEEDEMA
 class SpeedEMA {
   private value = 0;
-  constructor(private alpha = 0.2) {}
+  constructor(private alpha = 0.2) { }
 
   update(sample: number) {
     if (this.value === 0) {
@@ -24,7 +24,7 @@ class SpeedEMA {
   }
 }
 export class CopyRunnerService {
-  constructor(private ws?: Broadcaster) {}
+  constructor(private ws?: Broadcaster) { }
 
   async run({
     scheduleId,
@@ -39,7 +39,7 @@ export class CopyRunnerService {
     name: string;
     source: string;
     destination: string;
-    option?: { recycle: boolean; recycle_path: string };
+    option?: { recycle: boolean, recycle_path: string }
   }) {
     let currentFile = "";
     let currentStatus: "copying" | "deleted" | "idle" = "idle";
@@ -47,7 +47,6 @@ export class CopyRunnerService {
     const copier = new RobocopyService(this.ws);
 
     const files = walkDir(source);
-    const fileQueue = files.map((f) => f.path);
     const totalFiles = files.length;
     const totalBytes = files.reduce((s, f) => s + f.size, 0);
 
@@ -73,7 +72,6 @@ export class CopyRunnerService {
 
     // --- Real-time speed emitter ---
     const emitSpeed = () => {
-      if (!currentFile) return;
       const now = Date.now();
       const deltaBytes = copiedBytes - lastBytes;
       const deltaTime = (now - lastTime) / 1000 || 1;
@@ -96,7 +94,6 @@ export class CopyRunnerService {
         scheduleId,
       });
     };
-    currentFile = fileQueue.length ? path.basename(fileQueue[0]) : "";
 
     const speedInterval = setInterval(emitSpeed, 500);
 
@@ -122,12 +119,7 @@ export class CopyRunnerService {
     });
 
     copier.on("file-copied", ({ file, size }) => {
-      // remove finished file
-      fileQueue.shift();
-
-      // set next file immediately
-      currentFile = fileQueue.length ? path.basename(fileQueue[0]) : "";
-
+      currentFile = path.basename(file); // <-- NEW
       currentStatus = "copying";
 
       copiedFiles++;
@@ -175,7 +167,6 @@ export class CopyRunnerService {
         saveTimeout = setTimeout(flushLogs, 200);
       }
     });
-
     //FROM HERE
     const moveToDeletePath = async (file: string) => {
       const relative = path.relative(destination, file);
@@ -184,7 +175,6 @@ export class CopyRunnerService {
       await fs.move(file, target, { overwrite: true });
     };
 
-<<<<<<< HEAD
 
 
     copier.on("file-deleted", async ({ file }) => {
@@ -194,11 +184,6 @@ export class CopyRunnerService {
 
       if (option?.recycle) {
         // soft delete
-=======
-    // SOFT DELETE
-    if (type === "sync" && option?.recycle) {
-      copier.on("file-extra", async ({ file }) => {
->>>>>>> 758a3fe5857cf51875b6831afe6f2b2cfce2aa39
         await moveToDeletePath(file);
         this.ws?.({
           type: "deleted",

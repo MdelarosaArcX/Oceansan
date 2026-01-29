@@ -49,7 +49,6 @@
 
                 <q-input v-model="form.name" outlined dense label="Schedule Name"
                   :rules="[(val) => !!val || 'Name is required']" required />
-                  {{ form.recycle }}
                 <q-checkbox v-if="form.type === 'sync'" v-model="form.recycle"  :indeterminate="indeterminate"
                   label="Recycle deleted sync file?" color="cyan" />
               </q-card>
@@ -72,7 +71,7 @@
                   </template>
                 </q-input>
 
-                <q-input v-if="form.recycle" v-model="form.recycle_path" outlined dense label="Recycle Folder"
+                <q-input v-if="form.recycle && form.type === 'sync'" v-model="form.recycle_path" outlined dense label="Recycle Folder"
                   :rules="[(val) => !!val || 'Recycle path is required']" required>
                   <template #prepend>
                     <q-icon name="folder" />
@@ -160,7 +159,7 @@ const form = reactive<SchedulePayload>({
   recycle_path: '',
   sched: [],
   time: '',
-  recycle:true,
+  recycle:false,
   type: 'archive',
   status: false,
 

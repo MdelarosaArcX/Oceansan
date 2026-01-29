@@ -253,7 +253,6 @@ function openCreate() {
 }
 
 function openEdit(row: JobRow) {
-  console.log(row,"jobbbasdasd")
   selectedSchedule.value = {
     id: row.id,
     name: row.name,
