@@ -50,7 +50,7 @@
                 <q-input v-model="form.name" outlined dense label="Schedule Name"
                   :rules="[(val) => !!val || 'Name is required']" required />
 
-                <q-checkbox v-if="form.type === 'sync'" v-model="recycle" :indeterminate="indeterminate"
+                <q-checkbox v-if="form.type === 'sync'" v-model="recycle" 
                   label="Recycle deleted sync file?" color="cyan" />
               </q-card>
 
@@ -177,7 +177,7 @@ const form = reactive<SchedulePayload>({
 // ];
 
 const checkedAll = ref<boolean>(false);
-const recycle = ref<boolean>(true);
+const recycle = ref<boolean>(false);
 const indeterminate = ref(false);
 
 watch(

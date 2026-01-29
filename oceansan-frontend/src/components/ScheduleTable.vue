@@ -256,6 +256,7 @@ function openEdit(row: JobRow) {
     status: row.status === 'Active' ? true : false,
   };
   dialog.value = true;
+  // console.log(selectedSchedule.value)
 }
 
 // After creating a schedule, refresh the table
