@@ -6,8 +6,16 @@
         <div class="text-subtitle1 text-weight-medium">Schedules</div>
       </div>
 
-      <q-btn unelevated :class="$q.dark.isActive ? 'bg-accent  text-base-dark-3' : 'bg-base-dark-2 text-base-light-1'"
-        icon="add_circle" rounded label="Create Schedule" @click="openCreate" no-caps />
+      <q-btn
+        unelevated
+        :class="$q.dark.isActive ? 'bg-accent  text-base-dark-3' : 'bg-base-dark-2 text-base-light-1'"
+        icon="add_circle"
+        rounded
+        label="Create Schedule"
+        @click="openCreate"
+        no-caps
+      />
+       {{ store }}
     </q-card-section>
 
     <q-separator />
@@ -41,7 +49,10 @@
       <!-- Status column -->
       <template #body-cell-status="props">
         <q-td :props="props">
-          <div v-if="store.runningJobId !== props.row.id" class="status-cell">
+          <div>
+           
+          </div>
+          <div v-if="store.runningJobId !== props.row.id && store.type !== 'complete'" class="status-cell">
             <q-chip dense rounded :color="statusColor(props.value)" text-color="white">
               {{ props.value }}
             </q-chip>
@@ -50,7 +61,7 @@
           <div v-else class="progress-cell">
             <q-linear-progress :value="store.percent / 100" rounded stripe animated size="14px" color="primary" />
             <div class="text-caption text-grey q-mt-xs ellipsis">
-              {{ store.percent }}% — {{ store.currentFile }}
+              {{ store.speed }} — {{ store.currentFile }} ({{ store.ratio }})<br>
             </div>
           </div>
         </q-td>
