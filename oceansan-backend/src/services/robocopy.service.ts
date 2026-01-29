@@ -41,7 +41,7 @@ export default class RobocopyService extends EventEmitter {
       "/Z",
       "/R:2",
       "/W:1",
-      "/MT:1",
+      "/MT:8",
       // "/MT:8", This means multiple files copy in parallel. There is no such thing as “current file” anymore — there are 8 files copying.
       "/TEE",
       "/BYTES",
