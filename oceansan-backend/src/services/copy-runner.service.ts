@@ -12,7 +12,7 @@ type Broadcaster = (data: unknown) => void;
 //SPEEDEMA
 class SpeedEMA {
   private value = 0;
-  constructor(private alpha = 0.2) { }
+  constructor(private alpha = 0.2) {}
 
   update(sample: number) {
     if (this.value === 0) {
@@ -24,7 +24,7 @@ class SpeedEMA {
   }
 }
 export class CopyRunnerService {
-  constructor(private ws?: Broadcaster) { }
+  constructor(private ws?: Broadcaster) {}
 
   async run({
     scheduleId,
@@ -39,7 +39,7 @@ export class CopyRunnerService {
     name: string;
     source: string;
     destination: string;
-    option?: { recycle: boolean, recycle_path: string }
+    option?: { recycle: boolean; recycle_path: string };
   }) {
     let currentFile = "";
     let currentStatus: "copying" | "deleted" | "idle" = "idle";
@@ -47,6 +47,11 @@ export class CopyRunnerService {
     const copier = new RobocopyService(this.ws);
 
     const files = walkDir(source);
+
+    const fileMap = new Map(
+      files.map((f) => [f.path, { size: f.size, status: "pending" }]),
+    );
+
     const totalFiles = files.length;
     const totalBytes = files.reduce((s, f) => s + f.size, 0);
 
@@ -161,7 +166,11 @@ export class CopyRunnerService {
         scheduleId,
       });
 
-      pendingFiles.push({ path: file, size, status: "copied" });
+      currentFile = path.basename(file);
+      currentStatus = "copying";
+
+      copiedFiles++;
+      copiedBytes += size;
 
       if (!saveTimeout) {
         saveTimeout = setTimeout(flushLogs, 200);
@@ -169,18 +178,17 @@ export class CopyRunnerService {
     });
     //FROM HERE
     const moveToDeletePath = async (file: string) => {
-      const relative = path.relative(destination, file);
+      const relative = path.relative(destination, path.normalize(file));
+
       const target = path.join(option?.recycle_path!, relative);
       await fs.ensureDir(path.dirname(target));
       await fs.move(file, target, { overwrite: true });
     };
 
-
-
     copier.on("file-deleted", async ({ file }) => {
       currentFile = path.basename(file);
       currentStatus = "deleted";
-      console.log(file,"deleted file")
+      console.log(file, "deleted file");
 
       if (option?.recycle) {
         // soft delete
@@ -200,11 +208,19 @@ export class CopyRunnerService {
       }
     });
 
-
     copier.on("complete", async () => {
       clearInterval(speedInterval);
-      if (saveTimeout) clearTimeout(saveTimeout);
+      for (const [path, meta] of fileMap) {
+        pendingFiles.push({
+          path,
+          size: meta.size,
+          status: "copied",
+        });
+      }
+
       await flushLogs();
+
+      if (saveTimeout) clearTimeout(saveTimeout);
 
       logDoc.endTime = new Date();
       await logDoc.save();
@@ -233,7 +249,7 @@ export class CopyRunnerService {
     if (type === "archive") {
       await copier.archive(source, destination);
     } else {
-      await copier.sync(source, destination,option);
+      await copier.sync(source, destination, option);
     }
 
     function formatSpeed(bytesPerSec: number) {
