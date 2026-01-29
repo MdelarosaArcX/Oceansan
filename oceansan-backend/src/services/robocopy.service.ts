@@ -63,7 +63,7 @@ export default class RobocopyService extends EventEmitter {
   /* ============================
      SYNC / MIRROR
      ============================ */
-  async sync(src: string, dest: string): Promise<void> {
+  async sync(src: string, dest: string, opts?: { recycle: boolean }): Promise<void> {
     this.ensureWindows();
 
     console.log("[robocopy][sync] SRC :", src);
@@ -77,7 +77,7 @@ export default class RobocopyService extends EventEmitter {
     const args = [
       src,
       dest,
-      "/MIR",
+      "/E",          // copy only
       "/Z",
       "/R:2",
       "/W:1",
@@ -86,6 +86,11 @@ export default class RobocopyService extends EventEmitter {
       "/BYTES",
       "/FP",
     ];
+
+    // ONLY hard delete uses /MIR
+    if (!opts?.recycle) {
+      args.push("/MIR");
+    }
 
     console.log("[robocopy][sync] CMD:");
     console.log("robocopy", args.join(" "));

@@ -6,28 +6,14 @@
         <div class="text-subtitle1 text-weight-medium">Schedules</div>
       </div>
 
-      <q-btn
-        unelevated
-        :class="$q.dark.isActive ? 'bg-accent  text-base-dark-3' : 'bg-base-dark-2 text-base-light-1'"
-        icon="add_circle"
-        rounded
-        label="Create Schedule"
-        @click="openCreate"
-        no-caps
-      />
+      <q-btn unelevated :class="$q.dark.isActive ? 'bg-accent  text-base-dark-3' : 'bg-base-dark-2 text-base-light-1'"
+        icon="add_circle" rounded label="Create Schedule" @click="openCreate" no-caps />
     </q-card-section>
 
     <q-separator />
 
-    <q-table
-      flat
-      class="modern-table"
-      :rows="rows"
-      :columns="columns"
-      row-key="id"
-      separator="horizontal"
-      :rows-per-page-options="[5, 10, 20]"
-    >
+    <q-table flat class="modern-table" :rows="rows" :columns="columns" row-key="id" separator="horizontal"
+      :rows-per-page-options="[5, 10, 20]">
       <template #body-cell-from="props">
         <q-td :props="props">
           <div class="path-cell">
@@ -62,14 +48,7 @@
           </div>
 
           <div v-else class="progress-cell">
-            <q-linear-progress
-              :value="store.percent / 100"
-              rounded
-              stripe
-              animated
-              size="14px"
-              color="primary"
-            />
+            <q-linear-progress :value="store.percent / 100" rounded stripe animated size="14px" color="primary" />
             <div class="text-caption text-grey q-mt-xs ellipsis">
               {{ store.percent }}% — {{ store.currentFile }}
             </div>
@@ -85,7 +64,8 @@
               <q-tooltip>Run</q-tooltip>
             </q-btn>
 
-            <q-btn dense flat round icon="edit" :color="$q.dark.isActive ? 'accent' : 'base-dark-2'" @click="openEdit(props.row)">
+            <q-btn dense flat round icon="edit" :color="$q.dark.isActive ? 'accent' : 'base-dark-2'"
+              @click="openEdit(props.row)">
               <q-tooltip>Edit</q-tooltip>
             </q-btn>
 
@@ -120,11 +100,13 @@ interface JobRow {
   name: string;
   from: string;
   to: string;
+  recycle_path: string;
   last_archived?: string | null;
   last_sync?: string | null;
   sched: number[];
   time: string;
   type: 'sync' | 'archive';
+  recycle: boolean;
   status: 'Active' | 'In-active';
 }
 
@@ -221,10 +203,12 @@ async function fetchSchedules() {
       name: s.sched_name,
       from: s.src_path,
       to: s.dest_path,
+      recycle_path: s.recycle_path ?? '',
       sched: s.days ?? [],
       last_archived: s.last_archived ?? '',
       last_sync: s.last_sync ?? '',
       type: s.type,
+      recycle: s.recycle,
       status: s.active ? 'Active' : 'In-active',
       time: s.time,
     }));
@@ -264,9 +248,11 @@ function openEdit(row: JobRow) {
     name: row.name,
     src_path: row.from,
     dest_path: row.to,
+    recycle_path: row.recycle_path,
     sched: row.sched,
     type: row.type,
     time: row.time,
+    recycle: row.recycle,
     status: row.status === 'Active' ? true : false,
   };
   dialog.value = true;
@@ -280,9 +266,11 @@ async function saveSchedule(payload: SchedulePayload) {
       sched_name: payload.name,
       src_path: payload.src_path,
       dest_path: payload.dest_path,
+      recycle_path: payload.recycle_path || "",
       days: payload.sched.map(Number),
       type: payload.type,
       time: payload.time,
+      recycle: payload.recycle,
       active: payload.status,
     });
     console.log('Update schedule', payload);
@@ -295,9 +283,11 @@ async function saveSchedule(payload: SchedulePayload) {
       sched_name: payload.name,
       src_path: payload.src_path,
       dest_path: payload.dest_path,
+      recycle_path: payload.recycle_path || "",
       days: payload.sched.map(Number),
       type: payload.type,
       time: payload.time,
+      recycle: payload.recycle,
       active: true,
     });
 
@@ -318,7 +308,7 @@ function shortenPath(path: string) {
 const store = useCopyStore();
 
 async function runJob(row: JobRow) {
-  await store.startCopy(row.id,row.name, row.from, row.to, row.type);
+  await store.startCopy(row.id, row.name, row.from, row.to, row.type);
   // Refresh table
   await fetchSchedules();
 }

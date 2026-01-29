@@ -53,6 +53,7 @@ class SchedulerService {
         name: schedule.sched_name,
         source: schedule.src_path,
         destination: schedule.dest_path,
+        option: {recycle:schedule.recycle,recycle_path:schedule.recycle_path},
       });
     } catch (err) {
       console.error("Schedule execution failed:", err);

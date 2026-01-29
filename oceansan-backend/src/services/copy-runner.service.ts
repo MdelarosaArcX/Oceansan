@@ -12,7 +12,7 @@ type Broadcaster = (data: unknown) => void;
 //SPEEDEMA
 class SpeedEMA {
   private value = 0;
-  constructor(private alpha = 0.2) {}
+  constructor(private alpha = 0.2) { }
 
   update(sample: number) {
     if (this.value === 0) {
@@ -24,7 +24,7 @@ class SpeedEMA {
   }
 }
 export class CopyRunnerService {
-  constructor(private ws?: Broadcaster) {}
+  constructor(private ws?: Broadcaster) { }
 
   async run({
     scheduleId,
@@ -32,12 +32,14 @@ export class CopyRunnerService {
     name,
     source,
     destination,
+    option,
   }: {
     scheduleId: string;
     type: "archive" | "sync";
     name: string;
     source: string;
     destination: string;
+    option?: { recycle: boolean, recycle_path: string }
   }) {
     let currentFile = "";
     let currentStatus: "copying" | "deleted" | "idle" = "idle";
@@ -165,8 +167,29 @@ export class CopyRunnerService {
         saveTimeout = setTimeout(flushLogs, 200);
       }
     });
+    //FROM HERE
+    const moveToDeletePath = async (file: string) => {
+      const relative = path.relative(destination, file);
+      const target = path.join(option?.recycle_path!, relative);
+      await fs.ensureDir(path.dirname(target));
+      await fs.move(file, target, { overwrite: true });
+    };
+
+    // SOFT DELETE 
+    if (type === "sync" && option?.recycle) {
+      copier.on("file-extra", async ({ file }) => {
+        await moveToDeletePath(file);
+        this.ws?.({
+          type: "deleted",
+          mode: "soft",
+          file,
+        });
+      });
+    }
+    // last here
 
     copier.on("file-deleted", ({ file }) => {
+      if (option?.recycle) return; // skip, already handled in soft-delete
       currentFile = path.basename(file);
       currentStatus = "deleted";
 
@@ -176,17 +199,6 @@ export class CopyRunnerService {
         ? Math.min(100, Math.floor((copiedBytes / totalBytes) * 100))
         : 0;
 
-      // this.ws?.({
-      //   type: "progress",
-      //   currentFile: file,
-      //   status: "deleted",
-      //   percent,
-      //   speedBps: 0,
-      //   bytesCopied: copiedBytes,
-      //   totalBytes,
-      //   filesCopied: copiedFiles,
-      //   totalFiles,
-      // });
       if (!saveTimeout) {
         saveTimeout = setTimeout(flushLogs, 200);
       }

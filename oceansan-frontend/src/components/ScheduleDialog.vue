@@ -1,9 +1,5 @@
 <template>
-  <q-dialog
-    :model-value="modelValue"
-    @update:model-value="emit('update:modelValue', $event)"
-    persistent
-  >
+  <q-dialog :model-value="modelValue" @update:model-value="emit('update:modelValue', $event)" persistent>
     <q-card class="q-pa-none" style="width: 720px; max-width: 90vw">
       <!-- Header -->
       <q-card-section class="row items-center justify-between q-pb-sm">
@@ -45,63 +41,47 @@
               <q-card flat bordered class="q-pa-md q-gutter-md">
                 <div class="text-subtitle2">Basic Information</div>
 
-                <q-select
-                  v-model="form.type"
-                  :rules="[(val) => !!val || 'Schedule Type is required']"
-                  :options="[
-                    { value: 'archive', label: 'Archive' },
-                    { value: 'sync', label: 'Sync' },
-                  ]"
-                  option-value="value"
-                  option-label="label"
-                  emit-value
-                  map-options
-                  outlined
-                  dense
-                  required
-                  label="Schedule Type"
-                />
+                <q-select v-model="form.type" :rules="[(val) => !!val || 'Schedule Type is required']" :options="[
+                  { value: 'archive', label: 'Archive' },
+                  { value: 'sync', label: 'Sync' },
+                ]" option-value="value" option-label="label" emit-value map-options outlined dense required
+                  label="Schedule Type" />
 
-                <q-input
-                  v-model="form.name"
-                  outlined
-                  dense
-                  label="Schedule Name"
-                  :rules="[(val) => !!val || 'Name is required']"
-                  required
-                />
+                <q-input v-model="form.name" outlined dense label="Schedule Name"
+                  :rules="[(val) => !!val || 'Name is required']" required />
+
+                <q-checkbox v-if="form.type === 'sync'" v-model="recycle" :indeterminate="indeterminate"
+                  label="Recycle deleted sync file?" color="cyan" />
               </q-card>
 
               <!-- Paths -->
               <q-card flat bordered class="q-pa-md q-gutter-md">
                 <div class="text-subtitle2">Paths</div>
 
-                <q-input
-                  v-model="form.src_path"
-                  outlined
-                  dense
-                  icon="folder"
-                  label="Source Folder"
-                  :rules="[(val) => !!val || 'Source path is required']"
-                  required
-                >
-                <template #prepend>
-                    <q-icon name="folder" />
-                  </template>
-                </q-input>
-
-                <q-input
-                  v-model="form.dest_path"
-                  outlined
-                  dense
-                  label="Destination Folder"
-                  :rules="[(val) => !!val || 'Destination path is required']"
-                  required
-                >
+                <q-input v-model="form.src_path" outlined dense icon="folder" label="Source Folder"
+                  :rules="[(val) => !!val || 'Source path is required']" required>
                   <template #prepend>
                     <q-icon name="folder" />
                   </template>
                 </q-input>
+
+                <q-input v-model="form.dest_path" outlined dense label="Destination Folder"
+                  :rules="[(val) => !!val || 'Destination path is required']" required>
+                  <template #prepend>
+                    <q-icon name="folder" />
+                  </template>
+                </q-input>
+
+                <q-input v-if="recycle" v-model="form.recycle_path" outlined dense label="Recycle Folder"
+                  :rules="[(val) => !!val || 'Recycle path is required']" required>
+                  <template #prepend>
+                    <q-icon name="folder" />
+                  </template>
+                </q-input>
+
+
+
+
               </q-card>
 
               <!-- Schedule -->
@@ -113,35 +93,16 @@
                   <div class="text-caption text-grey q-mb-sm">Select days to run</div>
 
                   <div class="row q-gutter-sm items-center">
-                    <q-checkbox
-                      v-model="checkedAll"
-                      :indeterminate="indeterminate"
-                      label="All Days"
-                      color="cyan"
-                    />
+                    <q-checkbox v-model="checkedAll" :indeterminate="indeterminate" label="All Days" color="cyan" />
 
-                    <q-checkbox
-                      v-for="day in DAY_OPTIONS"
-                      :key="day.value"
-                      v-model="form.sched"
-                      :val="day.value"
-                      :label="day.label"
-                      color="cyan"
-                      dense
-                    />
+                    <q-checkbox v-for="day in DAY_OPTIONS" :key="day.value" v-model="form.sched" :val="day.value"
+                      :label="day.label" color="cyan" dense />
                   </div>
                 </div>
 
                 <!-- Time -->
-                <q-input
-                  v-model="form.time"
-                  outlined
-                  dense
-                  mask="time"
-                  :rules="['time']"
-                  required
-                  label="Execution Time"
-                >
+                <q-input v-model="form.time" outlined dense mask="time" :rules="['time']" required
+                  label="Execution Time">
                   <template #append>
                     <q-icon name="access_time" class="cursor-pointer">
                       <q-popup-proxy cover transition-show="scale" transition-hide="scale">
@@ -168,15 +129,8 @@
         <div class="row justify-end q-gutter-sm">
           <q-btn rounded flat label="Reset" type="reset" form="schedule-form" />
 
-          <q-btn
-            no-caps
-            rounded
-            unelevated
-            :label="isEdit ? 'Update Schedule' : 'Create Schedule'"
-            color="primary"
-            type="submit"
-            form="schedule-form"
-          />
+          <q-btn no-caps rounded unelevated :label="isEdit ? 'Update Schedule' : 'Create Schedule'" color="primary"
+            type="submit" form="schedule-form" />
         </div>
       </q-card-section>
     </q-card>
@@ -203,10 +157,13 @@ const form = reactive<SchedulePayload>({
   name: '',
   src_path: '',
   dest_path: '',
+  recycle_path: '',
   sched: [],
   time: '',
+  recycle:true,
   type: 'archive',
   status: false,
+
 });
 
 // const days = [
@@ -220,6 +177,7 @@ const form = reactive<SchedulePayload>({
 // ];
 
 const checkedAll = ref<boolean>(false);
+const recycle = ref<boolean>(true);
 const indeterminate = ref(false);
 
 watch(
@@ -271,6 +229,7 @@ function reset() {
     name: '',
     src_path: '',
     dest_path: '',
+    recycle_path: '',
     sched: [],
     time: '',
   });

@@ -4,9 +4,11 @@ export interface CreateSchedulePayload {
   sched_name: string;
   src_path: string;
   dest_path: string;
+  recycle_path: string;
   days: number[];
   type: 'sync' | 'archive';
   time: string;
+  recycle: boolean;
   active: boolean;
 }
 
@@ -15,9 +17,11 @@ export interface UpdateSchedulePayload {
   sched_name: string;
   src_path: string;
   dest_path: string;
+  recycle_path: string;
   days: number[];
   type: 'sync' | 'archive';
   time: string;
+  recycle: boolean;
   active: boolean;
 }
 
@@ -34,10 +38,10 @@ export async function getSchedules() {
 
 // create schedule
 export function updateSchedule(payload: UpdateSchedulePayload) {
-  return api.put('/api/schedules/'+payload.id, payload);
+  return api.put('/api/schedules/' + payload.id, payload);
 }
 
 // delete schedule
 export function deleteSchedule(id: string) {
-  return api.delete('/api/schedules/'+id);
+  return api.delete('/api/schedules/' + id);
 }
