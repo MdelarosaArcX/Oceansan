@@ -10,6 +10,10 @@ export const useCopyStore = defineStore('copy', {
     type: '',
     speed: '',
     ratio: '',
+    freeGB: '',
+    heapUsedMB: '',
+    heapTotalMB: '',
+    rssMB: '',
   }),
 
   actions: {
@@ -33,6 +37,12 @@ export const useCopyStore = defineStore('copy', {
         },
         (p) => {
           this.ratio = p.ratio;
+        },
+        (p, gb) => {
+          this.freeGB = gb;
+          this.heapUsedMB = p.heapUsedMB;
+          this.heapTotalMB = p.heapTotalMB;
+          this.rssMB = p.rssMB;
         },
       );
     },

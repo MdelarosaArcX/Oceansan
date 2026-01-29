@@ -15,7 +15,6 @@
         @click="openCreate"
         no-caps
       />
-       {{ store }}
     </q-card-section>
 
     <q-separator />
