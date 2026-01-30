@@ -1,4 +1,5 @@
 import { api } from 'boot/axios';
+import type { AxiosError } from "axios";
 
 export interface CreateSchedulePayload {
   sched_name: string;
@@ -12,6 +13,10 @@ export interface CreateSchedulePayload {
   active: boolean;
 }
 
+
+interface ApiErrorResponse {
+  error?: string;
+}
 export interface UpdateSchedulePayload {
   id: string;
   sched_name: string;
@@ -26,8 +31,24 @@ export interface UpdateSchedulePayload {
 }
 
 // create schedule
-export function createSchedule(payload: CreateSchedulePayload) {
-  return api.post('/api/schedules', payload);
+export async function createSchedule(payload: CreateSchedulePayload) {
+  try {
+    const { data } = await api.post("/api/schedules", payload);
+    return data;
+  } catch (err: unknown) {
+    if (err instanceof Error && "response" in err) {
+      const axiosErr = err as AxiosError<ApiErrorResponse>;
+
+      if (axiosErr.response?.status === 409) {
+        throw new Error(
+          axiosErr.response.data?.error ||
+          "Schedule already exists for the same source, destination, and time"
+        );
+      }
+    }
+
+    throw err;
+  }
 }
 
 // get all schedules

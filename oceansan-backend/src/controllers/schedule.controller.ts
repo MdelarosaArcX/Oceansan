@@ -2,14 +2,41 @@ import { Request, Response } from "express";
 import Schedule from "../models/Schedule";
 
 /** CREATE */
+const normalizeDays = (days: number[]) =>
+  [...new Set(days)].sort((a, b) => a - b);
+
 export const createSchedule = async (req: Request, res: Response) => {
   try {
-    const schedule = await Schedule.create(req.body);
+    const { src_path, dest_path, time, days } = req.body;
+
+    const normalizedDays = normalizeDays(days);
+
+    // Check for existing schedule
+    const existing = await Schedule.findOne({
+      src_path,
+      dest_path,
+      time,
+      days: normalizedDays
+    });
+
+    if (existing) {
+      return res.status(409).json({
+        error: "Schedule already exists for the same source, destination, days, and time"
+      });
+    }
+
+    //  Create if not exists
+    const schedule = await Schedule.create({
+      ...req.body,
+      days: normalizedDays
+    });
+
     res.status(201).json(schedule);
   } catch (err) {
     res.status(400).json({ error: (err as Error).message });
   }
 };
+
 
 /** READ ALL */
 export const getSchedules = async (_req: Request, res: Response) => {

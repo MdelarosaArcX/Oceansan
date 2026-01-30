@@ -6,15 +6,8 @@
         <div class="text-subtitle1 text-weight-medium">Schedules</div>
       </div>
 
-      <q-btn
-        unelevated
-        :class="$q.dark.isActive ? 'bg-accent  text-base-dark-3' : 'bg-base-dark-2 text-base-light-1'"
-        icon="add_circle"
-        rounded
-        label="Create Schedule"
-        @click="openCreate"
-        no-caps
-      />
+      <q-btn unelevated :class="$q.dark.isActive ? 'bg-accent  text-base-dark-3' : 'bg-base-dark-2 text-base-light-1'"
+        icon="add_circle" rounded label="Create Schedule" @click="openCreate" no-caps />
     </q-card-section>
 
     <q-separator />
@@ -49,7 +42,7 @@
       <template #body-cell-status="props">
         <q-td :props="props">
           <div>
-           
+
           </div>
           <div v-if="store.runningJobId !== props.row.id && store.type !== 'complete'" class="status-cell">
             <q-chip dense rounded :color="statusColor(props.value)" text-color="white">
@@ -98,6 +91,7 @@ import {
   updateSchedule,
 } from 'src/services/schedule.service';
 import type { QTableColumn } from 'quasar';
+import { useQuasar } from 'quasar'
 import { onMounted, ref } from 'vue';
 import ScheduleDialog from './ScheduleDialog.vue';
 import type { BackendSchedule, SchedulePayload } from 'src/types/Schedule';
@@ -119,7 +113,7 @@ interface JobRow {
   recycle: boolean;
   status: 'Active' | 'In-active';
 }
-
+const $q = useQuasar()
 const dialog = ref(false);
 const selectedSchedule = ref<SchedulePayload | null>(null);
 
@@ -144,7 +138,7 @@ const columns: QTableColumn<JobRow>[] = [
     style: 'max-width: 260px',
     sortable: true,
   },
-  // ✅ NEW SCHEDULE COLUMN
+
   {
     name: 'sched',
     label: 'Days',
@@ -203,6 +197,7 @@ const columns: QTableColumn<JobRow>[] = [
 ];
 
 const rows = ref<JobRow[]>([]);
+const formError = ref("");
 
 async function fetchSchedules() {
   try {
@@ -271,25 +266,31 @@ function openEdit(row: JobRow) {
 
 // After creating a schedule, refresh the table
 async function saveSchedule(payload: SchedulePayload) {
-  if (payload.id) {
-    await updateSchedule({
-      id: payload.id,
-      sched_name: payload.name,
-      src_path: payload.src_path,
-      dest_path: payload.dest_path,
-      recycle_path: payload.recycle_path || "",
-      days: payload.sched.map(Number),
-      type: payload.type,
-      time: payload.time,
-      recycle: payload.recycle,
-      active: payload.status,
-    });
-    console.log('Update schedule', payload);
-    await fetchSchedules();
-    return;
-  }
+  formError.value = "";
 
   try {
+    if (payload.id) {
+      await updateSchedule({
+        id: payload.id,
+        sched_name: payload.name,
+        src_path: payload.src_path,
+        dest_path: payload.dest_path,
+        recycle_path: payload.recycle_path || "",
+        days: payload.sched.map(Number),
+        type: payload.type,
+        time: payload.time,
+        recycle: payload.recycle,
+        active: payload.status,
+      });
+
+      $q.notify({
+      type: "success",
+      message:"Schedule Updated !"
+    });
+      await fetchSchedules();
+      return;
+    }
+
     await createSchedule({
       sched_name: payload.name,
       src_path: payload.src_path,
@@ -302,14 +303,33 @@ async function saveSchedule(payload: SchedulePayload) {
       active: true,
     });
 
-    console.log('Schedule created');
+    $q.notify({
+      type: "success",
+      message:"Schedule Created !"
+    });
 
-    // Refresh table
     await fetchSchedules();
-  } catch (err) {
-    console.error('Failed to create schedule', err);
+    dialog.value = false;
+
+  } catch (err: unknown) {
+    const message =
+      err instanceof Error
+        ? err.message
+        : "Failed to save schedule";
+
+    formError.value = message;
+
+    $q.notify({
+      type: "negative",
+      message
+    });
+
+
+    console.error("Failed to create/update schedule", err);
+    return false;
   }
 }
+
 
 function shortenPath(path: string) {
   if (!path) return '—';
@@ -319,8 +339,8 @@ function shortenPath(path: string) {
 const store = useCopyStore();
 
 async function runJob(row: JobRow) {
-  console.log(row,"asdasdsa")
-  await store.startCopy(row.id, row.name, row.from, row.to, row.type,row.recycle,row.recycle_path);
+  console.log(row, "asdasdsa")
+  await store.startCopy(row.id, row.name, row.from, row.to, row.type, row.recycle, row.recycle_path);
   // Refresh table
   await fetchSchedules();
 }

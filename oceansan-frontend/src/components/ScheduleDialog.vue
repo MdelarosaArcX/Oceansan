@@ -49,7 +49,7 @@
 
                 <q-input v-model="form.name" outlined dense label="Schedule Name"
                   :rules="[(val) => !!val || 'Name is required']" required />
-                <q-checkbox v-if="form.type === 'sync'" v-model="form.recycle"  :indeterminate="indeterminate"
+                <q-checkbox v-if="form.type === 'sync'" v-model="form.recycle" :indeterminate="indeterminate"
                   label="Recycle deleted sync file?" color="cyan" />
               </q-card>
 
@@ -65,14 +65,15 @@
                 </q-input>
 
                 <q-input v-model="form.dest_path" outlined dense label="Destination Folder"
-                  :rules="[(val) => !!val || 'Destination path is required']" required>
+                  :rules="[(val) => !!val || 'Destination path is required', (val) => val !== form.src_path || 'Destination must be different from Source']"
+                  required>
                   <template #prepend>
                     <q-icon name="folder" />
                   </template>
                 </q-input>
 
-                <q-input v-if="form.recycle && form.type === 'sync'" v-model="form.recycle_path" outlined dense label="Recycle Folder"
-                  :rules="[(val) => !!val || 'Recycle path is required']" required>
+                <q-input v-if="form.recycle && form.type === 'sync'" v-model="form.recycle_path" outlined dense
+                  label="Recycle Folder" :rules="[(val) => !!val || 'Recycle path is required']" required>
                   <template #prepend>
                     <q-icon name="folder" />
                   </template>
@@ -147,7 +148,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void;
-  (e: 'submit', value: SchedulePayload): void;
+  (e: 'submit', value: SchedulePayload): Promise<boolean>; // now async
 }>();
 
 const isEdit = computed(() => !!props.data?.id);
@@ -159,7 +160,7 @@ const form = reactive<SchedulePayload>({
   recycle_path: '',
   sched: [],
   time: '',
-  recycle:false,
+  recycle: false,
   type: 'archive',
   status: false,
 
@@ -214,10 +215,15 @@ watch(
   { deep: true },
 );
 
-function submit() {
-  emit('submit', { ...form });
-  reset();
-  close();
+async function submit() {
+  // Wait for parent to handle saving
+  const success = await emit('submit', { ...form });
+
+  // Only close if parent says it succeeded
+  if (success) {
+    reset();
+    close();
+  }
 }
 const allDayValues = DAY_OPTIONS.map((d) => d.value);
 
