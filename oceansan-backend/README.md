@@ -22,3 +22,7 @@ npm install -g .
 | `oceansan:logs` | `pm2 logs OceansanBackend` | View **live logs** from your backend. Logs are also saved in `%USERPROFILE%\.pm2\logs`. |
 | `oceansan:delete` | `pm2 delete OceansanBackend` | Completely removes the backend from PM2 management. |
 | `oceansan:save` | `pm2 save` | Saves the current PM2 process list so it **auto-starts on Windows boot**. |
+
+
+pm2 list
+pm2 logs OceansanBackend
