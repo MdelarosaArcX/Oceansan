@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import "./config/mongo";
 
 import express from "express";
