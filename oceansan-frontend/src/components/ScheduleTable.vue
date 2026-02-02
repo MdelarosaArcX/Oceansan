@@ -63,7 +63,7 @@
       <template #body-cell-action="props">
         <q-td :props="props">
           <div class="action-cell">
-            <q-btn dense flat round icon="play_arrow" color="primary" @click="runJob(props.row)">
+            <q-btn :disable="store.runningJobId == props.row.id && store.type !== 'complete'" dense flat round icon="play_arrow" color="primary" @click="runJob(props.row)">
               <q-tooltip>Run</q-tooltip>
             </q-btn>
 
@@ -288,6 +288,7 @@ async function saveSchedule(payload: SchedulePayload) {
       message:"Schedule Updated !"
     });
       await fetchSchedules();
+      dialog.value = false;
       return;
     }
 
@@ -312,6 +313,7 @@ async function saveSchedule(payload: SchedulePayload) {
     dialog.value = false;
 
   } catch (err: unknown) {
+    console.log(err,"err")
     const message =
       err instanceof Error
         ? err.message
