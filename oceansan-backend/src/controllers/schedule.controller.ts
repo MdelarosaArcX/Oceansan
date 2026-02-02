@@ -10,7 +10,7 @@ const normalizeDays = (days: number[]) =>
 const VALID_TIME_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 export const createSchedule = async (req: Request, res: Response) => {
   try {
-    const { sched_name,src_path, dest_path, time, days, type } = req.body;
+    const { sched_name, src_path, dest_path, time, days, type } = req.body;
 
     /* =========================
        BASIC VALIDATION
@@ -105,6 +105,31 @@ export const createSchedule = async (req: Request, res: Response) => {
         error: "Exact schedule already exists"
       });
     }
+    // DESTINATION OWNERSHIP RULE
+    const existingAtDestination = await Schedule.findOne({
+      dest_path: normalizedDest
+    });
+
+    if (existingAtDestination) {
+      // If ANY sync exists on this destination
+      if (existingAtDestination.type === "sync") {
+        return res.status(409).json({
+          error:
+            "Destination is already used by a sync schedule and cannot be reused"
+        });
+      }
+
+      // If new schedule is sync but destination already has archive from another source
+      if (
+        type === "sync" &&
+        existingAtDestination.src_path !== normalizedSrc
+      ) {
+        return res.status(409).json({
+          error:
+            "Destination is already used by an archive schedule from another source and cannot be synced"
+        });
+      }
+    }
 
     //  DESTINATION + TIME + OVERLAPPING DAYS (ARCHIVE vs SYNC INCLUDED)
     const destinationConflict = await Schedule.findOne({
@@ -153,9 +178,9 @@ export const createSchedule = async (req: Request, res: Response) => {
     return res.status(500).json({
       error: err.message
     });
-   
+
   }
-};  
+};
 
 
 /** READ ALL */
