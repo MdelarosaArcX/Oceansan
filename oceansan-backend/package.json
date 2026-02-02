@@ -8,7 +8,6 @@
     "dev:watch": "nodemon --watch 'src/**/*.ts' --exec npx ts-node src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "package": "nexe dist/server.js -t windows-x64-20.4.0 -o build/server.exe --build",
     "oceansan:start": "pm2 start dist/server.js --name OceansanBackend",
     "oceansan:stop": "pm2 stop OceansanBackend",
     "oceansan:restart": "pm2 restart OceansanBackend",
