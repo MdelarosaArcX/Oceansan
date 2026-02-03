@@ -7,7 +7,13 @@ export const useCopyStore = defineStore('copy', {
     runningJobId: null as string | null,
     percent: 0,
     currentFile: '',
-    status: '',
+    type: '',
+    speed: '',
+    ratio: '',
+    freeGB: '',
+    heapUsedMB: '',
+    heapTotalMB: '',
+    rssMB: '',
   }),
 
   actions: {
@@ -16,9 +22,9 @@ export const useCopyStore = defineStore('copy', {
         (jobId, p) => {
           this.running = true;
           this.runningJobId = jobId;
-          this.percent = p.percent;
           this.currentFile = p.currentFile;
-          this.status = p.status;
+          this.type = p.type;
+          this.speed = p.speed;
         },
         (jobId) => {
           if (this.runningJobId === jobId) {
@@ -26,16 +32,27 @@ export const useCopyStore = defineStore('copy', {
             this.runningJobId = null;
           }
         },
+        (p) => {
+          this.percent = p.percent;
+        },
+        (p) => {
+          this.ratio = p.ratio;
+        },
+        (p, gb) => {
+          this.freeGB = gb;
+          this.heapUsedMB = p.heapUsedMB;
+          this.heapTotalMB = p.heapTotalMB;
+          this.rssMB = p.rssMB;
+        },
       );
     },
-    async startCopy(jobId: string, from: string, to: string, type: string) {
+    async startCopy(jobId: string, name: string, from: string, to: string, type: string, recycle: boolean, recycle_path: string) {
       this.running = true;
       this.runningJobId = jobId;
       this.percent = 0;
       this.currentFile = '';
-      this.status = '';
-
-      await startCopy(from, to, type, jobId);
+      this.type = '';
+      await startCopy(from, to, type, jobId, name, recycle, recycle_path);
     },
   },
 });

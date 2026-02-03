@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import "./config/mongo";
 
 import express from "express";
@@ -9,6 +11,7 @@ import scheduleLogsRoutes from "./routes/scheduleLogs.routes";
 import schedulerService from "./services/scheduler.service";
 import Schedule from "./models/Schedule";
 import { CopyRunnerService } from "./services/copy-runner.service";
+import RamMonitorService from "./services/ram-monitor.service";
 
 const app = express();
 app.use(
@@ -36,6 +39,18 @@ function broadcast(data: unknown) {
   });
 }
 
+
+wss.on("connection", (ws) => {
+  console.log("🔌 Client connected");
+
+  const ramMonitor = new RamMonitorService(broadcast, 1000);
+  ramMonitor.start();
+
+  ws.on("close", () => {
+    ramMonitor.stop();
+    console.log("client disconeccted");
+  });
+});
 console.log("WebSocket running on ws://localhost:3001");
 
 /* ---------------- Scheduler ---------------- */
@@ -45,7 +60,7 @@ schedulerService.start(); //  REQUIRED
 
 /* ---------------- REST APIs ---------------- */
 app.post("/copy/start", async (req, res) => {
-  const { from, to, type, jobId, name } = req.body;
+  const { from, to, type, jobId, name, recycle, recycle_path } = req.body;
   if (!from || !to) {
     return res.status(400).json({ error: "Missing from/to paths" });
   }
@@ -59,7 +74,8 @@ app.post("/copy/start", async (req, res) => {
       name: name,
       source: from,
       destination: to,
-      
+      option: { recycle, recycle_path }
+
     });
 
     res.json({ status: "started" });

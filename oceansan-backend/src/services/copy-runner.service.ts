@@ -1,13 +1,30 @@
 import fs from "fs-extra";
 import path from "path";
-import CopyService from "./copy.service";
-import ScheduleLogs from "../models/ScheduleLogs";
-import Schedule, { ISchedule } from "../models/Schedule";
+
+import RobocopyService from "./robocopy.service";
+import ScheduleLogs, { ILogsFile } from "../models/ScheduleLogs";
+import Schedule from "../models/Schedule";
+import { walkDir } from "../utils/fileWalker";
+import { ScheduleLogger } from "../utils/scheduler.logger";
 
 type Broadcaster = (data: unknown) => void;
 
+//SPEEDEMA
+class SpeedEMA {
+  private value = 0;
+  constructor(private alpha = 0.2) {}
+
+  update(sample: number) {
+    if (this.value === 0) {
+      this.value = sample;
+    } else {
+      this.value = this.alpha * sample + (1 - this.alpha) * this.value;
+    }
+    return this.value;
+  }
+}
 export class CopyRunnerService {
-  constructor(private broadcaster?: Broadcaster) { }
+  constructor(private ws?: Broadcaster) {}
 
   async run({
     scheduleId,
@@ -15,141 +32,237 @@ export class CopyRunnerService {
     name,
     source,
     destination,
+    option,
   }: {
-    scheduleId?: string;
+    scheduleId: string;
     type: "archive" | "sync";
     name: string;
     source: string;
     destination: string;
+    option?: { recycle: boolean; recycle_path: string };
   }) {
-    const copier = new CopyService();
-    let finished = false;
-    let lastPercent = 0;
+    let currentFile = "";
+    let currentStatus: "copying" | "deleted" | "idle" = "idle";
 
-    /* ---------- DB LOG ---------- */
-    const execution = await ScheduleLogs.create({
+    const copier = new RobocopyService(this.ws);
+
+    const files = walkDir(source);
+
+    const fileMap = new Map(
+      files.map((f) => [f.path, { size: f.size, status: "pending" }]),
+    );
+
+    const totalFiles = files.length;
+    const totalBytes = files.reduce((s, f) => s + f.size, 0);
+
+    const logDoc = await ScheduleLogs.create({
       scheduleId,
       type,
       source,
       destination,
       startTime: new Date(),
-      totalFiles: 0,
-      totalSize: 0,
-      files: []
+      totalFiles,
+      totalSize: totalBytes,
+      files: [],
     });
 
-    /* ---------- FILE LOG ---------- */
-    const logsDir = path.join(process.cwd(), "logs");
-    await fs.ensureDir(logsDir);
+    let copiedFiles = 0;
+    let copiedBytes = 0;
 
-    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const logFile = path.join(
-      logsDir,
-      `log_${type}_${name}_${timestamp}.txt`
-    );
+    let lastBytes = 0;
+    let lastTime = Date.now();
 
-    const appendLog = (line: string) =>
-      fs.appendFile(logFile, line + "\n");
+    const ema = new SpeedEMA(0.15);
+    const startedAt = Date.now();
 
-    await appendLog(`${type.toUpperCase()} STARTED`);
-    await appendLog(`ID: ${scheduleId}`);
-    await appendLog(`Name: ${name}`);
-    await appendLog(`Source: ${source}`);
-    await appendLog(`Destination: ${destination}`);
+    // --- Real-time speed emitter ---
+    const emitSpeed = () => {
+      const now = Date.now();
+      const deltaBytes = copiedBytes - lastBytes;
+      const deltaTime = (now - lastTime) / 1000 || 1;
+      const rawSpeed = deltaBytes / deltaTime;
+      const smoothSpeed = ema.update(rawSpeed);
 
-    /* ---------- PROGRESS ---------- */
-    copier.on("progress", (progress) => {
-      lastPercent = progress.percent;
-      this.broadcaster?.({
+      lastBytes = copiedBytes;
+      lastTime = now;
+
+      const percent = totalBytes
+        ? Math.min(100, Math.floor((copiedBytes / totalBytes) * 100))
+        : 0;
+
+      const speed = formatSpeed(smoothSpeed);
+
+      this.ws?.({
         type: "progress",
-        jobId: scheduleId,
-        payload: {
-          percent: progress.percent,
-          currentFile: progress.currentFile,
-        },
+        currentFile,
+        speed: speed.value.toFixed(2) + " " + speed.unit,
+        scheduleId,
       });
-    });
-
-    /* ---------- FILE EVENTS ---------- */
-    const recordFile = async (
-      status: "copied" | "updated" | "deleted" | "error",
-      file: string,
-      size = 0,
-      error?: string
-    ) => {
-      execution.files.push({ path: file, size, status, error });
-      execution.totalFiles++;
-      if (status !== "deleted") execution.totalSize += size;
     };
 
-    copier.on("file-copied", async ({ file, size }) => {
-      await recordFile("copied", file, size);
-      await appendLog(`[${lastPercent}%] copied: ${file}`);
+    const speedInterval = setInterval(emitSpeed, 500);
+
+    // Buffer to batch save
+    const pendingFiles: ILogsFile[] = [];
+    let saveTimeout: NodeJS.Timeout | null = null;
+
+    const flushLogs = async () => {
+      if (pendingFiles.length === 0) return;
+      logDoc.files.push(...pendingFiles);
+      logDoc.totalFiles = logDoc.files.length;
+      logDoc.totalSize = logDoc.files.reduce((s, f) => s + f.size, 0);
+      pendingFiles.length = 0;
+      await logDoc.save();
+      saveTimeout = null;
+    };
+
+    this.ws?.({
+      type: "start",
+      totalFiles,
+      totalBytes,
+      startedAt,
     });
 
-    copier.on("file-updated", async ({ file, size }) => {
-      await recordFile("updated", file, size);
-      await appendLog(`[${lastPercent}%] updated: ${file}`);
-    });
+    copier.on("file-copied", ({ file, size }) => {
+      currentFile = path.basename(file); // <-- NEW
+      currentStatus = "copying";
 
-    copier.on("file-deleted", async ({ file }) => {
-      await recordFile("deleted", file);
-      await appendLog(`[${lastPercent}%] deleted: ${file}`);
-    });
+      copiedFiles++;
+      copiedBytes += size;
 
-    copier.on("file-error", async ({ file, error }) => {
-      await recordFile("error", file, 0, error);
-      await appendLog(`[${lastPercent}%] ${file} - ${error}`);
-    });
+      // speed calculation
+      const now = Date.now();
+      const deltaBytes = copiedBytes - lastBytes;
+      const deltaTime = (now - lastTime) / 1000 || 1;
+      const rawSpeed = deltaBytes / deltaTime;
+      const smoothSpeed = ema.update(rawSpeed);
+      lastBytes = copiedBytes;
+      lastTime = now;
 
-    /* ---------- COMPLETE ---------- */
-    copier.on("complete", async () => {
-      if (finished) return;
-      finished = true;
+      // percent
+      const percent = totalBytes
+        ? Math.min(100, Math.floor((copiedBytes / totalBytes) * 100))
+        : 0;
 
-      execution.endTime = new Date();
-      await execution.save();
+      const speed = formatSpeed(smoothSpeed);
 
-      this.broadcaster?.({
-        type: "complete",
-        jobId: scheduleId,
-        summary: {
-          totalFiles: execution.totalFiles,
-          totalSize: execution.totalSize,
-        },
+      // send a single progress websocket event
+      // this.ws?.({
+      //   type: "progress",
+      //   currentFile: file,
+      //   status: "copying",
+      //   percent,
+      //   speed: speed.value.toFixed(2) + " " + speed.unit,
+      //   bytesCopied: copiedBytes,
+      //   totalBytes,
+      //   filesCopied: copiedFiles,
+      //   totalFiles,
+      // });
+
+      this.ws?.({
+        type: "progress 123",
+        currentFile: file,
+        speed: speed.value.toFixed(2) + " " + speed.unit,
+        scheduleId,
       });
 
-      await appendLog("Completed");
-      await appendLog(`End Time: ${new Date().toISOString()}`);
+      currentFile = path.basename(file);
+      currentStatus = "copying";
 
-      await Schedule.updateOne(
-        { _id: scheduleId },
-        {
-          $set:
-            type === "archive"
-              ? { last_archived: new Date() }
-              : { last_sync: new Date() },
-        },
-      );
+      copiedFiles++;
+      copiedBytes += size;
+
+      if (!saveTimeout) {
+        saveTimeout = setTimeout(flushLogs, 200);
+      }
+    });
+    //FROM HERE
+    const moveToDeletePath = async (file: string) => {
+      const relative = path.relative(destination, path.normalize(file));
+
+      const target = path.join(option?.recycle_path!, relative);
+      await fs.ensureDir(path.dirname(target));
+      await fs.move(file, target, { overwrite: true });
+    };
+
+    copier.on("file-deleted", async ({ file }) => {
+      currentFile = path.basename(file);
+      currentStatus = "deleted";
+      console.log(file, "deleted file");
+
+      if (option?.recycle) {
+        // soft delete
+        await moveToDeletePath(file);
+        this.ws?.({
+          type: "deleted",
+          mode: "soft",
+          file,
+        });
+      } else {
+        // hard delete
+        pendingFiles.push({ path: file, size: 0, status: "deleted" });
+      }
+
+      if (!saveTimeout) {
+        saveTimeout = setTimeout(flushLogs, 200);
+      }
     });
 
-    copier.on("error", async (err: Error) => {
-      if (finished) return;
-      finished = true;
+    copier.on("complete", async () => {
+      clearInterval(speedInterval);
+      for (const [path, meta] of fileMap) {
+        pendingFiles.push({
+          path,
+          size: meta.size,
+          status: "copied",
+        });
+      }
 
-      execution.endTime = new Date();
-      await execution.save();
+      await flushLogs();
 
-      await appendLog(`ERROR: ${err.message}`);
+      if (saveTimeout) clearTimeout(saveTimeout);
+
+      logDoc.endTime = new Date();
+      await logDoc.save();
+
+      const durationSeconds = Math.floor((Date.now() - startedAt) / 1000);
+      const avgSpeed = durationSeconds > 0 ? totalBytes / durationSeconds : 0;
+
+      this.ws?.({
+        type: "complete",
+        totalFiles,
+        totalBytes,
+        scheduleId,
+        averageSpeedBps: Math.floor(avgSpeed),
+        durationSeconds,
+      });
     });
 
-    /* ---------- EXECUTE ---------- */
+    copier.on("error", (err) => {
+      clearInterval(speedInterval);
+      this.ws?.({
+        type: "error",
+        message: err.message,
+      });
+    });
+
     if (type === "archive") {
-      await copier._archive(source, destination);
+      await copier.archive(source, destination);
     } else {
-      await copier._sync(source, destination);
+      await copier.sync(source, destination, option);
     }
 
-    return logFile;
+    function formatSpeed(bytesPerSec: number) {
+      if (bytesPerSec >= 1024 ** 3) {
+        return { value: bytesPerSec / 1024 ** 3, unit: "GB/s" };
+      }
+      if (bytesPerSec >= 1024 ** 2) {
+        return { value: bytesPerSec / 1024 ** 2, unit: "MB/s" };
+      }
+      if (bytesPerSec >= 1024) {
+        return { value: bytesPerSec / 1024, unit: "KB/s" };
+      }
+      return { value: bytesPerSec, unit: "B/s" };
+    }
   }
 }
