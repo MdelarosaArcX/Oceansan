@@ -51,9 +51,11 @@
           </div>
 
           <div v-else class="progress-cell">
-            <q-linear-progress :value="store.percent / 100" rounded stripe animated size="14px" color="primary" />
+            <q-chip dense rounded color="red" text-color="white">
+              Running
+            </q-chip>
             <div class="text-caption text-grey q-mt-xs ellipsis">
-              {{ store.speed }} — {{ store.currentFile }} ({{ store.ratio }})<br>
+              {{ store.speed }}<br>
             </div>
           </div>
         </q-td>
