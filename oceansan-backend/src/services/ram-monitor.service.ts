@@ -39,19 +39,19 @@ export default class RamMonitorService {
       }
 
       // 🟢 Always send live stats
-      this.broadcast({
-        type: "RAM_USAGE",
-        payload: {
-          process: {
-            rssMB,
-            heapUsedMB: +(mem.heapUsed / 1024 / 1024).toFixed(2),
-            heapTotalMB: +(mem.heapTotal / 1024 / 1024).toFixed(2),
-          },
-          system: {
-            freeGB: +(os.freemem() / 1024 / 1024 / 1024).toFixed(2),
-          },
-        },
-      });
+      // this.broadcast({
+      //   type: "RAM_USAGE",
+      //   payload: {
+      //     process: {
+      //       rssMB,
+      //       heapUsedMB: +(mem.heapUsed / 1024 / 1024).toFixed(2),
+      //       heapTotalMB: +(mem.heapTotal / 1024 / 1024).toFixed(2),
+      //     },
+      //     system: {
+      //       freeGB: +(os.freemem() / 1024 / 1024 / 1024).toFixed(2),
+      //     },
+      //   },
+      // });
     }, this.intervalMs);
   }
 

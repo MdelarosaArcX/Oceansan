@@ -180,10 +180,10 @@ export default class RobocopyService extends EventEmitter {
 
         if (percentMatch) {
           const percent = parseInt(percentMatch[1], 10);
-          this.ws?.({
-            type: "percentage",
-            percent, // number only
-          });
+          // this.ws?.({
+          //   type: "percentage",
+          //   percent, // number only
+          // });
         }
         console.log("================================");
 
@@ -220,10 +220,10 @@ export default class RobocopyService extends EventEmitter {
             // SEND WS PROGRESS
             copiedFiles++;
 
-            this.ws?.({
-              type: "ratio",
-              ratio: `${copiedFiles}/${totalFiles}`,
-            });
+            // this.ws?.({
+            //   type: "ratio",
+            //   ratio: `${copiedFiles}/${totalFiles}`,
+            // });
 
             this.emit("file-copied", { file, size });
             continue;
