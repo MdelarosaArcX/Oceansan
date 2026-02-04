@@ -13,14 +13,6 @@ type ProgressPayload = {
   ratio: string;
 };
 
-type PercentPayload = {
-  percent: number;
-};
-
-type RatioPayload = {
-  ratio: string;
-};
-
 type RamPayload = {
   freeGB: string;
   heapUsedMB: string;
@@ -34,8 +26,6 @@ export function startCopy(from: string, to: string, type: string, jobId: string,
 export function connectProgress(
   onProgress: (jobId: string, p: ProgressPayload) => void,
   onComplete: (jobId: string) => void,
-  onPercentage: (p: PercentPayload) => void,
-  onFileComplete: (p: RatioPayload) => void,
   onRamUsage: (p: RamPayload, gb: string) => void,
 ) {
   socket = new WebSocket(WS_URL);
@@ -46,16 +36,8 @@ export function connectProgress(
       onProgress(data.scheduleId, data);
     }
 
-    if (data.type === 'percentage') {
-      onPercentage(data);
-    }
-
     if (data.type === 'complete') {
       onComplete(data.scheduleId);
-    }
-
-    if (data.type === 'ratio') {
-      onFileComplete(data);
     }
 
     if (data.type === 'RAM_USAGE') {

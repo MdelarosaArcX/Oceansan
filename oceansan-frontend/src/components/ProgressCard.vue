@@ -1,11 +1,11 @@
 <template>
   <q-card class="dashboard-card">
     <q-card-section class="row items-center q-gutter-sm">
-      <q-icon
+      <!-- <q-icon
         name="sync"
         size="20px"
         :color="store.running ? 'primary' : 'grey'"
-      />
+      /> -->
       <div class="text-subtitle1 text-weight-medium">
         Copy Progress
       </div>
@@ -13,7 +13,7 @@
 
     <q-separator />
 
-    <q-card-section v-if="store.running">
+    <!-- <q-card-section v-if="store.running">
       <q-linear-progress
         :value="store.percent / 100"
         rounded
@@ -33,12 +33,12 @@
       <div class="q-mt-sm">
         No active copy job
       </div>
-    </q-card-section>
+    </q-card-section> -->
   </q-card>
 </template>
 
 <script setup lang="ts">
-import { useCopyStore } from "stores/copy.store";
+// import { useCopyStore } from "stores/copy.store";
 
-const store = useCopyStore();
+// const store = useCopyStore();
 </script>

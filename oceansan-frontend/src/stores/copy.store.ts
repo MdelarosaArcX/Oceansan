@@ -3,40 +3,34 @@ import { startCopy, connectProgress } from 'src/services/copy.api';
 
 export const useCopyStore = defineStore('copy', {
   state: () => ({
-    running: false,
-    runningJobId: null as string | null,
-    percent: 0,
-    currentFile: '',
-    type: '',
-    speed: '',
-    ratio: '',
     freeGB: '',
     heapUsedMB: '',
     heapTotalMB: '',
     rssMB: '',
+    jobs: {} as Record<
+      string,
+      {
+        type: string;
+        speed: string;
+        status: 'running' | 'complete';
+      }
+    >,
   }),
 
   actions: {
     connect() {
       connectProgress(
         (jobId, p) => {
-          this.running = true;
-          this.runningJobId = jobId;
-          this.currentFile = p.currentFile;
-          this.type = p.type;
-          this.speed = p.speed;
+          this.jobs[jobId] = {
+            type: p.type,
+            speed: p.speed,
+            status: 'running',
+          };
         },
         (jobId) => {
-          if (this.runningJobId === jobId) {
-            this.running = false;
-            this.runningJobId = null;
+          if (this.jobs[jobId]) {
+            this.jobs[jobId].status = 'complete';
           }
-        },
-        (p) => {
-          this.percent = p.percent;
-        },
-        (p) => {
-          this.ratio = p.ratio;
         },
         (p, gb) => {
           this.freeGB = gb;
@@ -46,12 +40,22 @@ export const useCopyStore = defineStore('copy', {
         },
       );
     },
-    async startCopy(jobId: string, name: string, from: string, to: string, type: string, recycle: boolean, recycle_path: string) {
-      this.running = true;
-      this.runningJobId = jobId;
-      this.percent = 0;
-      this.currentFile = '';
-      this.type = '';
+
+    async startCopy(
+      jobId: string,
+      name: string,
+      from: string,
+      to: string,
+      type: string,
+      recycle: boolean,
+      recycle_path: string,
+    ) {
+      this.jobs[jobId] = {
+        type: '',
+        speed: '',
+        status: 'running',
+      };
+
       await startCopy(from, to, type, jobId, name, recycle, recycle_path);
     },
   },
