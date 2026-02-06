@@ -1,4 +1,4 @@
-import { EventEmitter } from "events";
+import { CopyEngine } from "./copy.engine";
 import { spawn } from "child_process";
 import os from "os";
 import { walkDir } from "../utils/fileWalker";
@@ -7,7 +7,7 @@ import path from "path";
 
 type Broadcaster = (data: unknown) => void;
 
-export default class RobocopyService extends EventEmitter {
+export default class RobocopyService extends CopyEngine  {
   constructor(private ws?: Broadcaster) {
     super();
     console.log("WS injected:", !!ws);
