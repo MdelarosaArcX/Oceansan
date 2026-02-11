@@ -3,6 +3,7 @@ import os from "os";
 import path from "path";
 import { CopyEngine } from "./copy.engine";
 import { normalizeWindowsPath } from "../utils/path.utils";
+import fs from "fs"
 
 type Broadcaster = (data: unknown) => void;
 
@@ -21,15 +22,16 @@ export default class XcopyService extends CopyEngine {
   async archive(src: string, dest: string): Promise<void> {
     this.ensureWindows();
 
-    // Normalize paths (CRITICAL)
-    const srcPath = normalizeWindowsPath(src);
-    const destPath = normalizeWindowsPath(dest);
+    const srcPath = normalizeWindowsPath(src) + "\\*";
+    const destPath = normalizeWindowsPath(dest) + "\\";
+
+    fs.mkdirSync(destPath, { recursive: true });
 
     const args = [
       "/c",
       "xcopy",
-      `"${srcPath}"`,
-      `"${destPath}"`,
+      srcPath,
+      destPath,
       "/E",
       "/I",
       "/Y",
@@ -43,6 +45,7 @@ export default class XcopyService extends CopyEngine {
     this.emit("start", {});
     await this.run(args);
   }
+
 
   async sync(src: string, dest: string): Promise<void> {
     // XCOPY has no true sync
