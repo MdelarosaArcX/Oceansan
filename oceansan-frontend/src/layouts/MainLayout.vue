@@ -25,6 +25,7 @@
             {{ isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode' }}
           </q-tooltip>
         </q-btn>
+        <q-btn flat round dense icon="settings" @click="dialogSettings = true"> </q-btn>
       </q-toolbar>
     </q-header>
     <q-drawer
@@ -73,6 +74,7 @@
 
     <q-page-container>
       <router-view />
+      <SettingsDialog v-model="dialogSettings" />
     </q-page-container>
   </q-layout>
 </template>
@@ -84,6 +86,7 @@ import { Dark } from 'quasar';
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
 import { useCopyStore } from 'src/stores/copy.store';
+import SettingsDialog from 'src/components/SettingsDialog.vue';
 
 const isDark = computed(() => Dark.isActive);
 
@@ -94,6 +97,7 @@ function toggleDark() {
 
 const store = useCopyStore();
 
+const dialogSettings = ref<boolean>(false);
 const drawer = ref(false);
 const menuList = [
   {
