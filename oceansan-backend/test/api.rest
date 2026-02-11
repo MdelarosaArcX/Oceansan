@@ -70,8 +70,8 @@ GET {{host}}/api/schedulesLogs?page=1&rowsPerPage=3&sortBy=createdAt&descending=
 POST {{host}}/copy/start
 {{json}}
 
-{"from":"C:/Users/tamid/Desktop/bk-src",
-"to":"C:/Users/tamid/Desktop/bk-trgt",
+{"from":"C:/Users/tamid/Documents/bk-src",
+"to":"C:/Users/tamid/Documents/bk-trgt",
 "type":"archive",
 "jobId":"697aabb1cac89cab0999e811",
 "name":"sync-rec",

@@ -10,13 +10,13 @@ const normalizeDays = (days: number[]) =>
 const VALID_TIME_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 export const createSchedule = async (req: Request, res: Response) => {
   try {
-    const { sched_name, src_path, dest_path, time, days, type } = req.body;
+    const { sched_name, src_path, dest_path, time, days, type,engine } = req.body;
 
     /* =========================
        BASIC VALIDATION
     ========================= */
 
-    if (!src_path || !dest_path || !time || !days || !type) {
+    if (!src_path || !dest_path || !time || !days || !type || !engine) {
       return res.status(400).json({
         error: "src_path, dest_path, time, days, and type are required"
       });
@@ -156,6 +156,7 @@ export const createSchedule = async (req: Request, res: Response) => {
       time,
       days: normalizedDays,
       type,
+      engine,
       active: true
     });
 
