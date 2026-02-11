@@ -3,7 +3,12 @@ import { spawn } from "child_process";
 import os from "os";
 import { CopyEngine, CopyOptions } from "./copy.engine";
 
+type Broadcaster = (data: unknown) => void;
 export default class RsyncService extends CopyEngine {
+  constructor(private ws?: Broadcaster) {
+    super();
+    console.log("WS injected:", !!ws);
+  }
   private ensureUnix() {
     if (os.platform() === "win32") {
       throw new Error("Rsync requires WSL or Unix OS");

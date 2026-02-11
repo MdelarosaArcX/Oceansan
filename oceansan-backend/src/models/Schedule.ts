@@ -6,6 +6,7 @@ export interface ISchedule extends Document {
   dest_path: string;
   recycle_path:string;
   type: "sync" | "archive";
+   engine: "xcopy" | "robocopy" | "rsync";
   time: string;           // HH:mm
   days: number[];         // 0-6 (Sun-Sat)
   active: boolean;
@@ -41,6 +42,11 @@ const ScheduleSchema = new Schema<ISchedule>(
           days.every(d => d >= 0 && d <= 6),
         message: "Days must be between 0 (Sun) and 6 (Sat)"
       }
+    },
+    engine: {
+      type: String,
+      enum: ["rsync", "robocopy","xcopy"],
+      required: true,
     },
 
     active: { type: Boolean, default: true },

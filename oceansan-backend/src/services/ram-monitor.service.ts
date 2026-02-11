@@ -6,14 +6,32 @@ export default class RamMonitorService {
   private timer?: NodeJS.Timeout;
   private warned = false;
 
+  private readonly osInfo = {
+    platform: os.platform(),      // win32 | linux | darwin
+    arch: os.arch(),              // x64 | arm64
+    release: os.release(),        // OS version
+    type: os.type(),              // Windows_NT | Linux | Darwin
+  };
+
   constructor(
     private broadcast: Broadcast,
     private intervalMs = 1000,
     private limitMB = 1024 // adjust limit here
-  ) {}
+  ) { }
 
   start() {
     if (!this.broadcast) return;
+
+    this.broadcast({
+      type: "SYSTEM_INFO",
+      payload: {
+        os: this.osInfo,
+        cpuCount: os.cpus().length,
+        totalMemoryGB: +(os.totalmem() / 1024 / 1024 / 1024).toFixed(2),
+        timestamp: Date.now(),
+      },
+    });
+
 
     this.timer = setInterval(() => {
       const mem = process.memoryUsage();
@@ -33,16 +51,18 @@ export default class RamMonitorService {
             message,
             rssMB,
             limitMB: this.limitMB,
+            os: this.osInfo,
             timestamp: Date.now(),
           },
         });
       }
 
-      // 🟢 Always send live stats
+      //  Always send live stats
       this.broadcast({
         type: "RAM_USAGE",
         payload: {
           process: {
+            os: this.osInfo,
             rssMB,
             heapUsedMB: +(mem.heapUsed / 1024 / 1024).toFixed(2),
             heapTotalMB: +(mem.heapTotal / 1024 / 1024).toFixed(2),
