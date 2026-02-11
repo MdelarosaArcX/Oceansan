@@ -60,7 +60,7 @@ schedulerService.start(); //  REQUIRED
 
 /* ---------------- REST APIs ---------------- */
 app.post("/copy/start", async (req, res) => {
-  const { from, to, type, jobId, name, recycle, recycle_path } = req.body;
+  const { from, to, type, jobId, name, recycle, recycle_path,engine } = req.body;
   if (!from || !to) {
     return res.status(400).json({ error: "Missing from/to paths" });
   }
@@ -74,7 +74,8 @@ app.post("/copy/start", async (req, res) => {
       name: name,
       source: from,
       destination: to,
-      option: { recycle, recycle_path }
+      option: { recycle, recycle_path },
+      engine
 
     });
 

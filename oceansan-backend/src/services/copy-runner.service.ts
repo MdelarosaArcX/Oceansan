@@ -1,7 +1,10 @@
 import fs from "fs-extra";
 import path from "path";
 
-import RobocopyService from "./robocopy.service";
+// import RobocopyService from "./robocopy.service";
+// import XcopyService from "./xcopy.service";
+// import RsyncService from "./rsync.service";
+import { createCopyEngine } from "./copy.factory"
 import ScheduleLogs, { ILogsFile } from "../models/ScheduleLogs";
 import Schedule from "../models/Schedule";
 import { walkDir } from "../utils/fileWalker";
@@ -12,7 +15,7 @@ type Broadcaster = (data: unknown) => void;
 //SPEEDEMA
 class SpeedEMA {
   private value = 0;
-  constructor(private alpha = 0.15) {}
+  constructor(private alpha = 0.15) { }
   update(sample: number) {
     if (this.value === 0) this.value = sample;
     else this.value = this.alpha * sample + (1 - this.alpha) * this.value;
@@ -47,7 +50,7 @@ function findLargestGrowingFile(
   return currentFile;
 }
 export class CopyRunnerService {
-  constructor(private ws?: Broadcaster) {}
+  constructor(private ws?: Broadcaster) { }
 
   async run({
     scheduleId,
@@ -55,6 +58,7 @@ export class CopyRunnerService {
     name,
     source,
     destination,
+    engine,
     option,
   }: {
     scheduleId: string;
@@ -62,9 +66,13 @@ export class CopyRunnerService {
     name: string;
     source: string;
     destination: string;
+    engine: "robocopy" | "xcopy" | "rsync";
     option?: { recycle: boolean; recycle_path: string };
   }) {
-    const copier = new RobocopyService(this.ws);
+    // const copier = new RobocopyService(this.ws);
+    const copier = createCopyEngine(engine, this.ws);
+
+
 
     const files = walkDir(source);
     const totalBytes = files.reduce((s, f) => s + f.size, 0);
