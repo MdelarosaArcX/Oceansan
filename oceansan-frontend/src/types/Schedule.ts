@@ -18,7 +18,7 @@ export interface SchedulePayload {
   dest_path: string;
   recycle_path?:string;
   sched: number[];
-  engine?: string;
+  engine: string;
   type: 'sync' | 'archive';
   time: string;
   recycle:boolean;
@@ -32,6 +32,7 @@ export interface BackendSchedule {
   dest_path: string;
   recycle_path?:string;
   days: number[];
+  engine: string;
   type: 'sync' | 'archive';
   time: string;
   recycle:boolean;

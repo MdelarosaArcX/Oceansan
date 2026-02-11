@@ -140,6 +140,7 @@ interface JobRow {
   last_sync?: string | null;
   sched: number[];
   time: string;
+  engine: string;
   type: 'sync' | 'archive';
   recycle: boolean;
   status: 'Active' | 'In-active';
@@ -243,6 +244,7 @@ async function fetchSchedules() {
       sched: s.days ?? [],
       last_archived: s.last_archived ?? '',
       last_sync: s.last_sync ?? '',
+      engine: s.engine,
       type: s.type,
       recycle: s.recycle,
       status: s.active ? 'Active' : 'In-active',
@@ -284,6 +286,7 @@ function openEdit(row: JobRow) {
     name: row.name,
     src_path: row.from,
     dest_path: row.to,
+    engine: row.engine,
     recycle_path: row.recycle_path,
     sched: row.sched,
     type: row.type,
@@ -308,6 +311,7 @@ async function saveSchedule(payload: SchedulePayload) {
         dest_path: payload.dest_path,
         recycle_path: payload.recycle_path || '',
         days: payload.sched.map(Number),
+        engine: payload.engine,
         type: payload.type,
         time: payload.time,
         recycle: payload.recycle,
@@ -329,6 +333,7 @@ async function saveSchedule(payload: SchedulePayload) {
       dest_path: payload.dest_path,
       recycle_path: payload.recycle_path || '',
       days: payload.sched.map(Number),
+      engine: payload.engine,
       type: payload.type,
       time: payload.time,
       recycle: payload.recycle,

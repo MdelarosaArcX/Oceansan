@@ -7,6 +7,7 @@ export interface CreateSchedulePayload {
   dest_path: string;
   recycle_path: string;
   days: number[];
+  engine: string;
   type: 'sync' | 'archive';
   time: string;
   recycle: boolean;
@@ -24,6 +25,7 @@ export interface UpdateSchedulePayload {
   dest_path: string;
   recycle_path: string;
   days: number[];
+  engine: string;
   type: 'sync' | 'archive';
   time: string;
   recycle: boolean;
