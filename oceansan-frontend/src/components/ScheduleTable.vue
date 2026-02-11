@@ -377,6 +377,7 @@ async function runJob(row: JobRow) {
     row.name,
     row.from,
     row.to,
+    row.engine,
     row.type,
     row.recycle,
     row.recycle_path,

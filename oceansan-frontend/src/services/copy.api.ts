@@ -19,8 +19,8 @@ type RamPayload = {
   heapTotalMB: string;
   rssMB: string;
 };
-export function startCopy(from: string, to: string, type: string, jobId: string,name:string,recycle:boolean,recycle_path:string) {
-  return axios.post(`${API_URL}/copy/start`, { from, to, type, jobId,name,recycle:recycle,recycle_path:recycle_path });
+export function startCopy(from: string, to: string, engine: string, type: string, jobId: string,name:string,recycle:boolean,recycle_path:string) {
+  return axios.post(`${API_URL}/copy/start`, { from, to, engine, type, jobId,name,recycle:recycle,recycle_path:recycle_path });
 }
 
 export function connectProgress(

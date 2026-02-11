@@ -46,6 +46,7 @@ export const useCopyStore = defineStore('copy', {
       name: string,
       from: string,
       to: string,
+      engine: string,
       type: string,
       recycle: boolean,
       recycle_path: string,
@@ -56,7 +57,7 @@ export const useCopyStore = defineStore('copy', {
         status: 'running',
       };
 
-      await startCopy(from, to, type, jobId, name, recycle, recycle_path);
+      await startCopy(from, to, engine, type, jobId, name, recycle, recycle_path);
     },
   },
 });
