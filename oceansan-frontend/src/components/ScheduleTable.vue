@@ -57,7 +57,6 @@
       <!-- Status column -->
       <template #body-cell-status="props">
         <q-td :props="props">
-          <div></div>
           <div
             v-if="!store.jobs[props.row.id] || store.jobs[props.row.id]?.status === 'complete'"
             class="status-cell"
@@ -69,7 +68,19 @@
 
           <div v-else class="progress-cell">
             <q-chip dense rounded color="red" text-color="white"> Running </q-chip>
-            <div class="text-caption text-grey q-mt-xs ellipsis">
+            <q-linear-progress
+              stripe
+              rounded
+              size="20px"
+              v-if="store.jobs[props.row.id]?.percent && props.row.engine === 'rclone'"
+              :value="store.jobs[props.row.id]?.percent"
+              color="primary"
+              class="q-mt-sm"
+              ><div class="absolute-full flex flex-center">
+                <q-badge text-color="white" color="primary" :label="store.jobs[props.row.id]?.speed" />
+              </div>
+            </q-linear-progress>
+            <div class="text-caption text-grey q-mt-xs ellipsis" v-if="props.row.engine !== 'rclone'">
               {{ store.jobs[props.row.id]?.speed }}
             </div>
           </div>

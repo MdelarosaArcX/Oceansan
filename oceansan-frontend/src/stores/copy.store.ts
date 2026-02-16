@@ -6,10 +6,12 @@ export const useCopyStore = defineStore('copy', {
     freeGB: '',
     heapUsedMB: '',
     heapTotalMB: '',
+    percent: '',
     rssMB: '',
     jobs: {} as Record<
       string,
       {
+        percent: number;
         type: string;
         speed: string;
         status: 'running' | 'complete';
@@ -24,6 +26,7 @@ export const useCopyStore = defineStore('copy', {
           this.jobs[jobId] = {
             type: p.type,
             speed: p.speed,
+            percent: p.percent / 100,
             status: 'running',
           };
         },
@@ -52,6 +55,7 @@ export const useCopyStore = defineStore('copy', {
       recycle_path: string,
     ) {
       this.jobs[jobId] = {
+        percent: 0,
         type: '',
         speed: '',
         status: 'running',
