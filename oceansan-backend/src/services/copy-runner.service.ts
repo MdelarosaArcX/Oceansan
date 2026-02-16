@@ -4,7 +4,7 @@ import path from "path";
 // import RobocopyService from "./robocopy.service";
 // import XcopyService from "./xcopy.service";
 // import RsyncService from "./rsync.service";
-import { createCopyEngine } from "./copy.factory"
+import { createCopyEngine } from "./copy.factory";
 import ScheduleLogs, { ILogsFile } from "../models/ScheduleLogs";
 import Schedule from "../models/Schedule";
 import { walkDir } from "../utils/fileWalker";
@@ -15,7 +15,7 @@ type Broadcaster = (data: unknown) => void;
 //SPEEDEMA
 class SpeedEMA {
   private value = 0;
-  constructor(private alpha = 0.15) { }
+  constructor(private alpha = 0.15) {}
   update(sample: number) {
     if (this.value === 0) this.value = sample;
     else this.value = this.alpha * sample + (1 - this.alpha) * this.value;
@@ -50,7 +50,7 @@ function findLargestGrowingFile(
   return currentFile;
 }
 export class CopyRunnerService {
-  constructor(private ws?: Broadcaster) { }
+  constructor(private ws?: Broadcaster) {}
 
   async run({
     scheduleId,
@@ -66,17 +66,14 @@ export class CopyRunnerService {
     name: string;
     source: string;
     destination: string;
-    engine: "robocopy" | "xcopy" | "rsync";
+    engine: "robocopy" | "xcopy" | "rsync" | "rclone";
     option?: { recycle: boolean; recycle_path: string };
   }) {
-    // const copier = new RobocopyService(this.ws);
     const copier = createCopyEngine(engine, this.ws);
 
-
-
-    const files = walkDir(source);
-    const totalBytes = files.reduce((s, f) => s + f.size, 0);
-    const totalFiles = files.length;
+    const sourceFiles = walkDir(source);
+    const totalBytes = sourceFiles.reduce((s, f) => s + f.size, 0);
+    const totalFiles = sourceFiles.length;
 
     const logDoc = await ScheduleLogs.create({
       scheduleId,
@@ -89,18 +86,54 @@ export class CopyRunnerService {
       files: [],
     });
 
-    const previousSizes = new Map<string, number>();
-    files.forEach((f) =>
-      previousSizes.set(path.join(destination, path.basename(f.path)), 0),
-    );
     const pendingFiles: ILogsFile[] = [];
-    let saveTimeout: NodeJS.Timeout | null = null;
     let copiedBytes = 0;
 
     const ema = new SpeedEMA();
-    let lastBytes = 0;
     let lastTime = Date.now();
     const startedAt = Date.now();
+
+    // --- SNAPSHOT DIFF ---
+    const sourceSnapshot = new Map<string, number>();
+    const destSnapshot = new Map<string, number>();
+
+    sourceFiles.forEach((f) => sourceSnapshot.set(f.path, f.size));
+    walkDir(destination).forEach((f) => destSnapshot.set(f.path, f.size));
+
+    // Handle files deleted in destination (restore from source)
+    for (const [srcPath, size] of sourceSnapshot.entries()) {
+      const destPath = path.join(destination, path.basename(srcPath));
+      if (!destSnapshot.has(destPath)) {
+        pendingFiles.push({ path: destPath, size, status: "copied" });
+      } else if (destSnapshot.get(destPath) !== size) {
+        pendingFiles.push({ path: destPath, size, status: "copied" });
+      } else {
+        pendingFiles.push({ path: destPath, size, status: "updated" });
+      }
+    }
+
+    // Handle files deleted in source (move to recycle if enabled)
+    for (const [destPath, size] of destSnapshot.entries()) {
+      const srcPath = path.join(source, path.basename(destPath));
+      if (!sourceSnapshot.has(srcPath)) {
+        if (option?.recycle && option.recycle_path) {
+          // Move deleted file to recycle folder
+          const recycleDest = path.join(
+            option.recycle_path,
+            path.basename(destPath),
+          );
+          fs.ensureDirSync(option.recycle_path);
+          fs.moveSync(destPath, recycleDest, { overwrite: true });
+          pendingFiles.push({
+            path: destPath,
+            size,
+            status: "deleted",
+          });
+        } else {
+          pendingFiles.push({ path: destPath, size, status: "deleted" });
+        }
+      }
+    }
 
     const flushLogs = async () => {
       if (pendingFiles.length === 0) return;
@@ -109,7 +142,6 @@ export class CopyRunnerService {
       logDoc.totalSize = logDoc.files.reduce((s, f) => s + f.size, 0);
       pendingFiles.length = 0;
       await logDoc.save();
-      saveTimeout = null;
     };
 
     this.ws?.({
@@ -119,28 +151,25 @@ export class CopyRunnerService {
       startedAt,
     });
 
-    // --- Start robocopy ---
+    // --- Start copy/sync ---
     const runPromise =
       type === "archive"
         ? copier.archive(source, destination)
         : copier.sync(source, destination, option);
 
-    // --- Destination monitor ---
-
+    // --- Monitor progress ---
     const monitorInterval = setInterval(() => {
       let deltaBytes = 0;
       let currentFile: string | null = null;
       const destFiles = walkDir(destination);
 
       for (const f of destFiles) {
-        const prev = previousSizes.get(f.path) || 0;
+        const prev = destSnapshot.get(f.path) || 0;
         const change = f.size - prev;
         if (change > 0) {
           deltaBytes += change;
-          previousSizes.set(f.path, f.size);
-
-          // pick largest growing file
-          if (!currentFile || change > (previousSizes.get(currentFile) || 0)) {
+          destSnapshot.set(f.path, f.size);
+          if (!currentFile || change > (destSnapshot.get(currentFile) || 0)) {
             currentFile = f.path;
           }
         }
@@ -152,35 +181,35 @@ export class CopyRunnerService {
         ? Math.min(100, (copiedBytes / totalBytes) * 100)
         : 0;
 
-      // Speed calculation
       const now = Date.now();
       const deltaTime = (now - lastTime) / 1000 || 1;
-      const rawSpeed = deltaBytes / deltaTime;
-      const smoothSpeed = ema.update(rawSpeed);
+      const smoothSpeed = ema.update(deltaBytes / deltaTime);
       lastTime = now;
 
-      const speedStr = formatSpeed(smoothSpeed);
+      const speedStr =
+        smoothSpeed >= 1024 ** 3
+          ? { value: smoothSpeed / 1024 ** 3, unit: "GB/s" }
+          : smoothSpeed >= 1024 ** 2
+            ? { value: smoothSpeed / 1024 ** 2, unit: "MB/s" }
+            : smoothSpeed >= 1024
+              ? { value: smoothSpeed / 1024, unit: "KB/s" }
+              : { value: smoothSpeed, unit: "B/s" };
 
       this.ws?.({
         type: "progress",
         currentFile: currentFile ? path.basename(currentFile) : null,
         speed: speedStr.value.toFixed(2) + " " + speedStr.unit,
-        percent,
+        percent: engine === 'rclone' ? percent : 0,
         copiedBytes,
         totalBytes,
         scheduleId,
       });
     }, 500);
 
-    // Wait for Robocopy to finish
+    // --- Wait for copy to finish ---
     try {
       await runPromise;
       clearInterval(monitorInterval);
-
-      // flush final state
-      for (const f of walkDir(destination)) {
-        pendingFiles.push({ path: f.path, size: f.size, status: "copied" });
-      }
       await flushLogs();
 
       logDoc.endTime = new Date();
@@ -203,16 +232,6 @@ export class CopyRunnerService {
         type: "error",
         message: err.message,
       });
-    }
-
-    function formatSpeed(bytesPerSec: number) {
-      if (bytesPerSec >= 1024 ** 3)
-        return { value: bytesPerSec / 1024 ** 3, unit: "GB/s" };
-      if (bytesPerSec >= 1024 ** 2)
-        return { value: bytesPerSec / 1024 ** 2, unit: "MB/s" };
-      if (bytesPerSec >= 1024)
-        return { value: bytesPerSec / 1024, unit: "KB/s" };
-      return { value: bytesPerSec, unit: "B/s" };
     }
   }
 }
