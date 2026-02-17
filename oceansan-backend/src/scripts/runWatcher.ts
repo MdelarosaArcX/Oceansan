@@ -33,6 +33,7 @@ async function run() {
         schedules.forEach((sched) => {
           if (sched.src_path) pathSet.add(normalizePath(sched.src_path));
           if (sched.dest_path) pathSet.add(normalizePath(sched.dest_path));
+          if (sched.recycle_path) pathSet.add(normalizePath(sched.recycle_path));
         });
 
         // Watch any new paths
