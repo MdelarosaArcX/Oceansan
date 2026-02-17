@@ -4,6 +4,7 @@ import path from "path";
 import chokidar from "chokidar";
 // import crypto from "crypto";
 import fileMetadata from "../models/FileMetadata";
+import Schedule from "../models/Schedule";
 
 import ffmpeg from "fluent-ffmpeg";
 import { exiftool } from "exiftool-vendored";
@@ -183,4 +184,5 @@ export default class FileWatcherService {
   async close() {
     if (this.watcher) await this.watcher.close();
   }
+  
 }
