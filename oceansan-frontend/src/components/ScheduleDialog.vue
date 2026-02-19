@@ -306,6 +306,7 @@ watch(
 async function submit() {
   // Wait for parent to handle saving
   const success = await emit('submit', { ...form });
+  reset();
 
   // Only close if parent says it succeeded
   if (success) {
