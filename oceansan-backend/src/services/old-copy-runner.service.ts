@@ -66,7 +66,7 @@ export class CopyRunnerService {
     name: string;
     source: string;
     destination: string;
-    engine: "robocopy" | "xcopy" | "rsync" | "rclone";
+    engine: "robocopy" | "xcopy" | "rclone";
     option?: { recycle: boolean; recycle_path: string };
   }) {
     // const copier = new RobocopyService(this.ws);

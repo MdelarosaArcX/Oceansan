@@ -51,7 +51,6 @@
                   :options="[
                     { value: 'robocopy', label: 'Robocopy' },
                     { value: 'xcopy', label: 'XCopy' },
-                    { value: 'rsync', label: 'RSync' },
                     { value: 'rclone', label: 'Rclone' },
                   ]"
                   option-value="value"

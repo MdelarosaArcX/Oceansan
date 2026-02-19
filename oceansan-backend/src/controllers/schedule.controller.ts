@@ -68,8 +68,8 @@ export const createSchedule = async (req: Request, res: Response) => {
       });
     }
 
-    const normalizedSrc = path.resolve(src_path).toLowerCase();
-    const normalizedDest = path.resolve(dest_path).toLowerCase();
+    const normalizedSrc = path.resolve(src_path);
+    const normalizedDest = path.resolve(dest_path);
 
     if (normalizedSrc === normalizedDest) {
       return res.status(400).json({

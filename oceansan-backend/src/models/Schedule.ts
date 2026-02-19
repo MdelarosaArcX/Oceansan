@@ -6,7 +6,7 @@ export interface ISchedule extends Document {
   dest_path: string;
   recycle_path:string;
   type: "sync" | "archive";
-   engine: "xcopy" | "robocopy" | "rsync" | "rclone";
+   engine: "xcopy" | "robocopy" | "rclone";
   time: string;           // HH:mm
   days: number[];         // 0-6 (Sun-Sat)
   active: boolean;
@@ -45,7 +45,7 @@ const ScheduleSchema = new Schema<ISchedule>(
     },
     engine: {
       type: String,
-      enum: ["rsync", "robocopy", "xcopy", "rclone"],
+      enum: ["robocopy", "xcopy", "rclone"],
       required: true,
     },
 
