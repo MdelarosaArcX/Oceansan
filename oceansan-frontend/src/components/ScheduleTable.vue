@@ -358,6 +358,7 @@ async function saveSchedule(payload: SchedulePayload) {
 
     await fetchSchedules();
     dialog.value = false;
+    selectedSchedule.value = null;
   } catch (err: unknown) {
     console.log(err, 'err');
     const message = err instanceof Error ? err.message : 'Failed to save schedule';
@@ -382,7 +383,6 @@ function shortenPath(path: string) {
 const store = useCopyStore();
 
 async function runJob(row: JobRow) {
-  console.log(row, 'asdasdsa');
   await store.startCopy(
     row.id,
     row.name,
