@@ -15,7 +15,7 @@ type Broadcaster = (data: unknown) => void;
 //SPEEDEMA
 class SpeedEMA {
   private value = 0;
-  constructor(private alpha = 0.15) {}
+  constructor(private alpha = 0.15) { }
   update(sample: number) {
     if (this.value === 0) this.value = sample;
     else this.value = this.alpha * sample + (1 - this.alpha) * this.value;
@@ -50,7 +50,7 @@ function findLargestGrowingFile(
   return currentFile;
 }
 export class CopyRunnerService {
-  constructor(private ws?: Broadcaster) {}
+  constructor(private ws?: Broadcaster) { }
 
   async run({
     scheduleId,
@@ -154,8 +154,8 @@ export class CopyRunnerService {
     // --- Start copy/sync ---
     const runPromise =
       type === "archive"
-        ? copier.archive(source, destination)
-        : copier.sync(source, destination, option);
+        ? await copier.archive(source, destination)
+        : await copier.sync(source, destination, option);
 
     // --- Monitor progress ---
     const monitorInterval = setInterval(() => {
