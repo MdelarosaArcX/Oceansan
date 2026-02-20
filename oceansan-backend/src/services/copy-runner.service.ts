@@ -154,8 +154,8 @@ export class CopyRunnerService {
     // --- Start copy/sync ---
     const runPromise =
       type === "archive"
-        ? await copier.archive(source, destination)
-        : await copier.sync(source, destination, option);
+        ?  copier.archive(source, destination)
+        :  copier.sync(source, destination, option);
 
     // --- Monitor progress ---
     const monitorInterval = setInterval(() => {
