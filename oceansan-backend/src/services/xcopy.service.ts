@@ -26,10 +26,8 @@ export default class XcopyService extends CopyEngine {
     const destPath = normalizeWindowsPath(dest);
 
     const args = [
-      "/c",
-      "xcopy",
-      `"${srcPath}"`,
-      `"${destPath}"`,
+      srcPath,
+      destPath,
       "/E",
       "/I",
       "/Y",
@@ -51,7 +49,7 @@ export default class XcopyService extends CopyEngine {
 
   private run(args: string[]): Promise<void> {
     return new Promise((resolve, reject) => {
-      const proc = spawn("cmd", args, {
+      const proc = spawn("xcopy", args, {
         shell: false,
         windowsHide: true,
       });

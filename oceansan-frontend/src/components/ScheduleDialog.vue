@@ -66,10 +66,7 @@
                 <q-select
                   v-model="form.type"
                   :rules="[(val) => !!val || 'Schedule Type is required']"
-                  :options="[
-                    { value: 'archive', label: 'Archive' },
-                    { value: 'sync', label: 'Sync' },
-                  ]"
+                  :options="scheduleTypeOptions"
                   option-value="value"
                   option-label="label"
                   emit-value
@@ -268,6 +265,23 @@ const checkedAll = ref<boolean>(false);
 // const recycle = ref<boolean>(false);
 const indeterminate = ref(false);
 
+const scheduleTypeOptions = computed(() => [
+  { value: "archive", label: "Archive" },
+  {
+    value: "sync",
+    label: "Sync",
+    disable: form.engine === "xcopy",
+  },
+]);
+
+watch(
+  () => form.engine,
+  (newVal) => {
+    if (newVal === "xcopy" && form.type === "sync") {
+      form.type = "archive";
+    }
+  }
+);
 watch(
   () => props.data,
   (val) => {
