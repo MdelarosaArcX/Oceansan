@@ -24,6 +24,7 @@ export type JobLog = {
   totalFiles: number;
   totalSize: number;
   files: FileLog[];
+  status: 'running' | 'completed' | 'failed' | 'interrupted';
 };
 
 export type LogsPagination = {

@@ -7,7 +7,7 @@ import path from "path";
 
 type Broadcaster = (data: unknown) => void;
 
-export default class RobocopyService extends CopyEngine  {
+export default class RobocopyService extends CopyEngine {
   constructor(private ws?: Broadcaster) {
     super();
     console.log("WS injected:", !!ws);
@@ -42,13 +42,26 @@ export default class RobocopyService extends CopyEngine  {
       totalSize,
     });
 
+    // const args = [
+    //   src,
+    //   dest,
+    //   "/E",
+    //   "/Z",
+    //   "/R:2",
+    //   "/W:1",
+    //   "/MT:8",
+    //   "/TEE",
+    //   "/BYTES",
+    //   "/FP",
+    // ];
     const args = [
       src,
       dest,
       "/E",
       "/Z",
-      "/R:2",
-      "/W:1",
+      "/FFT",
+      "/R:3",
+      "/W:5",
       "/MT:8",
       "/TEE",
       "/BYTES",
@@ -68,7 +81,7 @@ export default class RobocopyService extends CopyEngine  {
   async sync(
     src: string,
     dest: string,
-    opts?: { recycle: boolean; recycle_path: string }
+    opts?: { recycle: boolean; recycle_path: string },
   ): Promise<void> {
     this.ensureWindows();
 
@@ -80,7 +93,7 @@ export default class RobocopyService extends CopyEngine  {
       totalSize: 0,
     });
 
-    console.log(opts,"OPTIONS")
+    console.log(opts, "OPTIONS");
     /* ======================================================
        1️⃣ PRE-SCAN FOR SOFT DELETE (DEST - SRC)
        ====================================================== */
@@ -92,15 +105,11 @@ export default class RobocopyService extends CopyEngine  {
 
       // build source lookup using relative paths
       const srcSet = new Set(
-        srcFiles.map(f =>
-          path.relative(src, f.path).replace(/\\/g, "/")
-        )
+        srcFiles.map((f) => path.relative(src, f.path).replace(/\\/g, "/")),
       );
 
       for (const f of destFiles) {
-        const rel = path
-          .relative(dest, f.path)
-          .replace(/\\/g, "/");
+        const rel = path.relative(dest, f.path).replace(/\\/g, "/");
 
         // skip invalid paths
         if (!rel || rel.startsWith("..")) continue;
@@ -108,7 +117,7 @@ export default class RobocopyService extends CopyEngine  {
         // exists in DEST but NOT in SRC => recycle it
         if (!srcSet.has(rel)) {
           const target = path.join(opts.recycle_path, rel);
-          console.log(target,"TARGETSDSADSDAS")
+          console.log(target, "TARGETSDSADSDAS");
           console.log("[robocopy][sync] RECYCLE:", f.path);
 
           await fs.ensureDir(path.dirname(target));

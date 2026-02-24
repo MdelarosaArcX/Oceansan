@@ -3,6 +3,7 @@ import os from "os";
 
 import Schedule, { ISchedule } from "../models/Schedule";
 import { CopyRunnerService } from "./copy-runner.service";
+import { Types } from "mongoose";
 
 type Broadcaster = (data: unknown) => void;
 
@@ -48,7 +49,7 @@ class SchedulerService {
 
     try {
       await runner.run({
-        scheduleId: id,
+        scheduleId: new Types.ObjectId(id),
         type: schedule.type,
         name: schedule.sched_name,
         source: schedule.src_path,

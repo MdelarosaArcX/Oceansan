@@ -12,6 +12,8 @@ import schedulerService from "./services/scheduler.service";
 import Schedule from "./models/Schedule";
 import { CopyRunnerService } from "./services/copy-runner.service";
 import RamMonitorService from "./services/ram-monitor.service";
+import ScheduleLogs from "./models/ScheduleLogs";
+import { Types } from "mongoose";
 
 const app = express();
 app.use(
@@ -39,6 +41,33 @@ function broadcast(data: unknown) {
   });
 }
 
+async function resumeInterruptedJobs() {
+  const jobs = await ScheduleLogs.find({
+    status: "interrupted",
+  }).sort({ startTime: 1 });
+
+  for (const job of jobs) {
+    console.log("Resuming:", job._id);
+
+    // Mark it running again
+    // await ScheduleLogs.updateOne({ _id: job._id }, { status: "running" });
+
+    const runner = new CopyRunnerService(broadcast);
+
+    runner
+      .run({
+        scheduleId: job.scheduleId,
+        type: job.type,
+        name: "Recovered Job",
+        source: job.source,
+        destination: job.destination,
+        engine: job.engine as any,
+        existingLogId: job._id, // 👈 IMPORTANT
+      })
+      .catch(console.error);
+  }
+}
+resumeInterruptedJobs();
 
 wss.on("connection", (ws) => {
   console.log("🔌 Client connected");
@@ -60,7 +89,8 @@ schedulerService.start(); //  REQUIRED
 
 /* ---------------- REST APIs ---------------- */
 app.post("/copy/start", async (req, res) => {
-  const { from, to, type, jobId, name, recycle, recycle_path,engine } = req.body;
+  const { from, to, type, jobId, name, recycle, recycle_path, engine } =
+    req.body;
   if (!from || !to) {
     return res.status(400).json({ error: "Missing from/to paths" });
   }
@@ -68,21 +98,39 @@ app.post("/copy/start", async (req, res) => {
   try {
     const runner = new CopyRunnerService(broadcast);
 
+    await ScheduleLogs.updateOne({ _id: jobId }, { resumedFromCrash: true });
+
     await runner.run({
-      scheduleId: jobId,
+      scheduleId: new Types.ObjectId(jobId),
       type,
       name: name,
       source: from,
       destination: to,
       option: { recycle, recycle_path },
-      engine
-
+      engine,
     });
 
     res.json({ status: "started" });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
+});
+
+process.on("SIGINT", async () => {
+  console.log("Server shutting down...");
+  await ScheduleLogs.updateMany(
+    { status: "running" },
+    { status: "interrupted" },
+  );
+  process.exit();
+});
+
+process.on("SIGTERM", async () => {
+  await ScheduleLogs.updateMany(
+    { status: "running" },
+    { status: "interrupted" },
+  );
+  process.exit();
 });
 
 app.use("/api/schedules", scheduleRoutes);

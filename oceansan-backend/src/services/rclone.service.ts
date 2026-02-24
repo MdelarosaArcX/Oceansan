@@ -16,7 +16,11 @@ export default class RcloneService extends CopyEngine {
   }
 
   async sync(src: string, dest: string, opts?: CopyOptions): Promise<void> {
-    await this.runCopy(src, dest, opts?.recycle ? opts.recycle_path : undefined);
+    await this.runCopy(
+      src,
+      dest,
+      opts?.recycle ? opts.recycle_path : undefined,
+    );
   }
 
   private runCopy(
@@ -27,7 +31,25 @@ export default class RcloneService extends CopyEngine {
     return new Promise((resolve, reject) => {
       const command = backupDir ? "sync" : "copy";
 
-      const args = [command, src, dest, "--stats=1s", "--stats-one-line"];
+      // const args = [command, src, dest, "--stats=1s", "--stats-one-line"];
+     const args = [
+  command,
+  src,
+  dest,
+  "--stats=1s",
+  "--stats-one-line",
+
+  "--retries=10",
+  "--low-level-retries=20",
+
+  "--checksum",
+
+  "--partial-suffix=.part",
+
+  "--transfers=8",
+  "--checkers=16",
+  "--fast-list",
+];
 
       // const args = ["copy", src, dest, "--stats=1s", "--stats-one-line"];
 
@@ -64,14 +86,27 @@ export default class RcloneService extends CopyEngine {
         }
       });
 
+      let lastError = "";
+
       proc.stderr.on("data", (data: Buffer) => {
         const msg = data.toString();
+        lastError += msg;
         this.emit("log", msg);
       });
 
       proc.on("error", (err) => {
         reject(new Error(`Failed to start rclone: ${err.message}`));
       });
+
+      // proc.on("close", (code) => {
+      //   if (code === 0) {
+      //     this.emit("complete", { engine: "rclone" });
+      //     resolve();
+      //     return;
+      //   }
+
+      //   reject(new Error(`rclone failed (${code})`));
+      // });
 
       proc.on("close", (code) => {
         if (code === 0) {
@@ -80,7 +115,7 @@ export default class RcloneService extends CopyEngine {
           return;
         }
 
-        reject(new Error(`rclone failed (${code})`));
+        reject(new Error(`rclone failed (${code}): ${lastError}`));
       });
     });
   }

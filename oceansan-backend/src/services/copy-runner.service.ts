@@ -9,6 +9,7 @@ import ScheduleLogs, { ILogsFile } from "../models/ScheduleLogs";
 import Schedule from "../models/Schedule";
 import { walkDir } from "../utils/fileWalker";
 import { ScheduleLogger } from "../utils/scheduler.logger";
+import { Types } from "mongoose";
 
 type Broadcaster = (data: unknown) => void;
 
@@ -60,14 +61,16 @@ export class CopyRunnerService {
     destination,
     engine,
     option,
+    existingLogId
   }: {
-    scheduleId: string;
+    scheduleId: Types.ObjectId;
     type: "archive" | "sync";
     name: string;
     source: string;
     destination: string;
     engine: "robocopy" | "xcopy" | "rclone";
     option?: { recycle: boolean; recycle_path: string };
+    existingLogId?: Types.ObjectId;
   }) {
     const copier = createCopyEngine(engine, this.ws);
 
@@ -75,16 +78,38 @@ export class CopyRunnerService {
     const totalBytes = sourceFiles.reduce((s, f) => s + f.size, 0);
     const totalFiles = sourceFiles.length;
 
-    const logDoc = await ScheduleLogs.create({
-      scheduleId,
-      type,
-      source,
-      destination,
-      startTime: new Date(),
-      totalFiles,
-      totalSize: totalBytes,
-      files: [],
-    });
+    // const logDoc = await ScheduleLogs.create({
+    //   scheduleId,
+    //   type,
+    //   source,
+    //   destination,
+    //   startTime: new Date(),
+    //   totalFiles,
+    //   totalSize: totalBytes,
+    //   files: [],
+    // });
+
+    let logDoc;
+
+    if (existingLogId) {
+      logDoc = await ScheduleLogs.findById(existingLogId);
+      if (!logDoc) throw new Error("Log not found");
+    } else {
+      logDoc = await ScheduleLogs.create({
+        scheduleId,
+        type,
+        source,
+        destination,
+        startTime: new Date(),
+        totalFiles,
+        totalSize: totalBytes,
+        files: [],
+      });
+    }
+
+    logDoc.status = "running";
+    logDoc.engine = engine;
+    await logDoc.save();
 
     const pendingFiles: ILogsFile[] = [];
     let copiedBytes = 0;
@@ -199,7 +224,7 @@ export class CopyRunnerService {
         type: "progress",
         currentFile: currentFile ? path.basename(currentFile) : null,
         speed: speedStr.value.toFixed(2) + " " + speedStr.unit,
-        percent: engine === 'rclone' ? percent : 0,
+        percent: engine === "rclone" ? percent : 0,
         copiedBytes,
         totalBytes,
         scheduleId,
@@ -213,6 +238,7 @@ export class CopyRunnerService {
       await flushLogs();
 
       logDoc.endTime = new Date();
+      logDoc.status = "completed";
       await logDoc.save();
 
       const durationSeconds = Math.floor((Date.now() - startedAt) / 1000);
@@ -228,6 +254,8 @@ export class CopyRunnerService {
       });
     } catch (err: any) {
       clearInterval(monitorInterval);
+      logDoc.status = "interrupted";
+      await logDoc.save();
       this.ws?.({
         type: "error",
         message: err.message,

@@ -135,7 +135,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import type { QTableColumn } from 'quasar';
-import { fetchScheduleLogs } from 'src/services/scheduleLogs.service';
+import { fetchScheduleLogs, type JobLog } from 'src/services/scheduleLogs.service';
 
 /* -------------------------
  Types
@@ -159,18 +159,6 @@ interface QTableRequest {
   pagination: QTableRequestPagination;
 }
 
-interface JobLog {
-  _id: string;
-  scheduleId: string;
-  type: 'archive' | 'sync';
-  source: string;
-  destination: string;
-  startTime: string;
-  endTime?: string | null;
-  totalFiles: number;
-  totalSize: number;
-  files: FileLog[];
-}
 
 /* -------------------------
  State
@@ -250,6 +238,14 @@ const columns: QTableColumn<JobLog>[] = [
     },
   },
   { name: 'totalFiles', label: 'Files', field: 'totalFiles', align: 'center' },
+  {
+    name: 'status',
+    label: 'Status',
+    field: 'status',
+    align: 'left',
+    classes: 'ellipsis',
+    style: 'max-width: 260px',
+  },
   {
     name: 'totalSize',
     label: 'Total Size',
