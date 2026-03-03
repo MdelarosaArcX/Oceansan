@@ -64,6 +64,19 @@ export default class XcopyService extends CopyEngine {
         this.emit("log", d.toString());
       });
 
+      proc.on("error", (err) => {
+        console.error("[xcopy] spawn error:", err);
+
+        this.ws?.({
+          type: "error",
+          engine: "xcopy",
+          message: "Failed to start xcopy process",
+          details: err.message,
+        });
+
+        reject(err);
+      });
+
       proc.on("close", (code) => {
         console.log("[xcopy] exit code:", code);
 

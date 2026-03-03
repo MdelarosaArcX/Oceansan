@@ -7,7 +7,7 @@ import path from "path";
 
 type Broadcaster = (data: unknown) => void;
 
-export default class RobocopyService extends CopyEngine  {
+export default class RobocopyService extends CopyEngine {
   constructor(private ws?: Broadcaster) {
     super();
     console.log("WS injected:", !!ws);
@@ -80,7 +80,7 @@ export default class RobocopyService extends CopyEngine  {
       totalSize: 0,
     });
 
-    console.log(opts,"OPTIONS")
+    console.log(opts, "OPTIONS")
     /* ======================================================
        1️⃣ PRE-SCAN FOR SOFT DELETE (DEST - SRC)
        ====================================================== */
@@ -108,7 +108,7 @@ export default class RobocopyService extends CopyEngine  {
         // exists in DEST but NOT in SRC => recycle it
         if (!srcSet.has(rel)) {
           const target = path.join(opts.recycle_path, rel);
-          console.log(target,"TARGETSDSADSDAS")
+          console.log(target, "TARGETSDSADSDAS")
           console.log("[robocopy][sync] RECYCLE:", f.path);
 
           await fs.ensureDir(path.dirname(target));
@@ -269,6 +269,14 @@ export default class RobocopyService extends CopyEngine  {
           });
           resolve();
         } else {
+          const errorMessage = `Robocopy failed with exit code ${code}`;
+
+          this.ws?.({
+            type: "error",
+            mode,
+            message: errorMessage,
+            code,
+          });
           reject(new Error(`Robocopy failed with exit code ${code}`));
         }
       });

@@ -88,6 +88,31 @@ app.post("/copy/start", async (req, res) => {
 app.use("/api/schedules", scheduleRoutes);
 app.use("/api/schedulesLogs", scheduleLogsRoutes);
 
+/* =========================
+   SHUTDOWN HANDLERS
+========================= */
+process.on("SIGINT", () => {
+  console.log("Server shutting down (SIGINT)...");
+
+  broadcast({
+    type: "error",
+    message: "Server shutdown detected",
+  });
+
+  process.exit(0);
+});
+
+process.on("SIGTERM", () => {
+  console.log("Server shutting down (SIGTERM)...");
+
+  broadcast({
+    type: "error",
+    message: "Server terminated",
+  });
+
+  process.exit(0);
+});
+
 /* ---------------- Start Server ---------------- */
 
 app.listen(PORT, () => {
