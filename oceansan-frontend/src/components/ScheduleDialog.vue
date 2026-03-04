@@ -224,7 +224,7 @@
 
 <script setup lang="ts">
 import type { SchedulePayload } from 'src/types/Schedule';
-import { computed, reactive, ref, watch } from 'vue';
+import { computed, reactive, ref, watch} from 'vue';
 import { DAY_OPTIONS } from 'src/constants/days';
 const props = defineProps<{
   modelValue: boolean;
@@ -320,7 +320,7 @@ watch(
 async function submit() {
   // Wait for parent to handle saving
   const success = await emit('submit', { ...form });
-  reset();
+  // reset();
 
   // Only close if parent says it succeeded
   if (success) {
@@ -349,4 +349,5 @@ function close() {
   reset();
   emit('update:modelValue', false);
 }
+// onMounted(reset());
 </script>
