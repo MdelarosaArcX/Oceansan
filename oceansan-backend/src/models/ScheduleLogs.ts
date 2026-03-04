@@ -26,7 +26,7 @@ export interface IScheduleLogs {
 
   files: ILogsFile[];
 
-  status: JobStatus; // ✅ simple string union
+  status: JobStatus; // simple string union
   engine: "robocopy" | "xcopy" | "rclone";
   pid?: number;
   attemptCount: {

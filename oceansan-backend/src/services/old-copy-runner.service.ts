@@ -1,14 +1,9 @@
-import fs from "fs-extra";
 import path from "path";
 
-// import RobocopyService from "./robocopy.service";
-// import XcopyService from "./xcopy.service";
-// import RsyncService from "./rsync.service";
+
 import { createCopyEngine } from "./copy.factory"
 import ScheduleLogs, { ILogsFile } from "../models/ScheduleLogs";
-import Schedule from "../models/Schedule";
 import { walkDir } from "../utils/fileWalker";
-import { ScheduleLogger } from "../utils/scheduler.logger";
 
 type Broadcaster = (data: unknown) => void;
 
@@ -24,31 +19,31 @@ class SpeedEMA {
 }
 
 // Helper: sum file sizes recursively
-function sumFileSizes(dir: string) {
-  const files = walkDir(dir);
-  return files.reduce((s, f) => s + f.size, 0);
-}
+// function sumFileSizes(dir: string) {
+//   const files = walkDir(dir);
+//   return files.reduce((s, f) => s + f.size, 0);
+// }
 
 // Helper: find the largest growing file since last check
-function findLargestGrowingFile(
-  dir: string,
-  previousSizes: Map<string, number>,
-): string | null {
-  const files = walkDir(dir);
-  let largestDelta = 0;
-  let currentFile: string | null = null;
+// function findLargestGrowingFile(
+//   dir: string,
+//   previousSizes: Map<string, number>,
+// ): string | null {
+//   const files = walkDir(dir);
+//   let largestDelta = 0;
+//   let currentFile: string | null = null;
 
-  for (const f of files) {
-    const prev = previousSizes.get(f.path) || 0;
-    const delta = f.size - prev;
-    if (delta > largestDelta) {
-      largestDelta = delta;
-      currentFile = f.path;
-    }
-    previousSizes.set(f.path, f.size);
-  }
-  return currentFile;
-}
+//   for (const f of files) {
+//     const prev = previousSizes.get(f.path) || 0;
+//     const delta = f.size - prev;
+//     if (delta > largestDelta) {
+//       largestDelta = delta;
+//       currentFile = f.path;
+//     }
+//     previousSizes.set(f.path, f.size);
+//   }
+//   return currentFile;
+// }
 export class CopyRunnerService {
   constructor(private ws?: Broadcaster) { }
 

@@ -6,9 +6,7 @@ import path from "path";
 // import RsyncService from "./rsync.service";
 import { createCopyEngine } from "./copy.factory";
 import ScheduleLogs, { ILogsFile } from "../models/ScheduleLogs";
-import Schedule from "../models/Schedule";
 import { walkDir } from "../utils/fileWalker";
-import { ScheduleLogger } from "../utils/scheduler.logger";
 import { Types } from "mongoose";
 
 type Broadcaster = (data: unknown) => void;
