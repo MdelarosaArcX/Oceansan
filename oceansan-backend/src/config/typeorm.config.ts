@@ -9,7 +9,7 @@ export const AppDataSource = new DataSource({
   password: process.env.MYSQL_PASSWORD || "apppassword",
   database: process.env.MYSQL_DB || "appdb",
 
-  synchronize: false, // use migrations in production
+  synchronize: true, // use migrations in production
   logging: false,
 
   entities: ["src/entities/**/*.ts"],
