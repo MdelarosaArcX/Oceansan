@@ -1,46 +1,71 @@
-import mongoose from "mongoose";
+// runWatcher.ts
+import "reflect-metadata";
+import { DataSource } from "typeorm";
 import dotenv from "dotenv";
 dotenv.config();
 
-import Schedule from "../models/Schedule";
-import FileWatcherService from "../services/file-watcher.service";
+import { Schedule } from "../entities/Schedule";
+import { Directories } from "../entities/Directories";
+import { FileMetadata } from "../entities/FileMetadata";
+import { FileWatcherService } from "../services/file-watcher.service";
 
-// Normalize paths (Windows-friendly)
+const AppDataSource = new DataSource({
+  type: "mysql",
+  host: process.env.DB_HOST,
+  port: Number(process.env.DB_PORT),
+  username: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  entities: [Schedule, Directories, FileMetadata],
+  synchronize: true, // true only in dev
+});
+
 function normalizePath(p: string) {
   return p.replace(/\\/g, "/").toLowerCase();
 }
 
 async function run() {
   try {
-    // Connect to MongoDB
-    await mongoose.connect(process.env.MONGO_URI as string);
-    console.log("MongoDB connected.");
+    await AppDataSource.initialize();
+    console.log("Database connected via TypeORM.");
 
-    const watcher = new FileWatcherService();
-    const watchedPaths = new Set<string>(); // track paths already being watched
-    let isRunning = false; // prevent overlapping polls
+    const watcher = new FileWatcherService(AppDataSource);
+    const watchedPaths = new Set<string>();
+    let isRunning = false;
 
-    // --- FUNCTION TO FETCH AND WATCH SCHEDULE PATHS ---
+    const scheduleRepo = AppDataSource.getRepository(Schedule);
+    const directoriesRepo = AppDataSource.getRepository(Directories);
+    //  const fileMetaDataRepo = AppDataSource.getRepository(FileMetadata);
+
     const fetchAndWatch = async () => {
       if (isRunning) return;
       isRunning = true;
 
       try {
-        const schedules = await Schedule.find({ active: true }).lean();
+        // Fetch active schedules
+        const schedules = await scheduleRepo.find({ where: { active: true } });
         const pathSet = new Set<string>();
 
-        // Collect unique paths from schedules
         schedules.forEach((sched) => {
           if (sched.src_path) pathSet.add(normalizePath(sched.src_path));
           if (sched.dest_path) pathSet.add(normalizePath(sched.dest_path));
           if (sched.recycle_path) pathSet.add(normalizePath(sched.recycle_path));
         });
 
-        // Watch any new paths
+        // --- Save paths to Directories table and watch them ---
         for (const dirPath of pathSet) {
           if (!watchedPaths.has(dirPath)) {
+            // Save or get directory entity
+            let dirEntity = await directoriesRepo.findOne({ where: { path: dirPath } });
+            if (!dirEntity) {
+              dirEntity = directoriesRepo.create({ path: dirPath });
+              await directoriesRepo.save(dirEntity);
+            }
+
+            // Watch directory
             await watcher.watchPath(dirPath);
             watchedPaths.add(dirPath);
+
             console.log("Started watching new path:", dirPath);
           }
         }
@@ -53,10 +78,10 @@ async function run() {
       }
     };
 
-    // --- INITIAL LOAD ---
+    // Initial fetch
     await fetchAndWatch();
 
-    // --- POLL EVERY 30 SECONDS ---
+    // Poll every 30 seconds
     setInterval(fetchAndWatch, 30_000);
 
     console.log("Watcher running... Press Ctrl+C to stop.");

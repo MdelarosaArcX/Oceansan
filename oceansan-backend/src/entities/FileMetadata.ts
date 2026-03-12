@@ -2,25 +2,39 @@ import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
-  OneToMany,
+  ManyToOne,
   CreateDateColumn,
   UpdateDateColumn,
+  JoinColumn,
+  Unique
 } from "typeorm";
-import { FileMeta } from "./FileMeta";
+import { Directories } from "./Directories";
 
 @Entity("file_metadata")
+@Unique(["fileName", "directory"])
 export class FileMetadata {
 
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ unique: true })
-  path: string;
+  @Column()
+  fileName: string;
 
-  @OneToMany(() => FileMeta, (file) => file.fileMetadata, {
-    cascade: true,
-  })
-  files: FileMeta[];
+  @Column()
+  extension: string;
+
+  @Column()
+  size: number;
+
+  @Column({ type: "json", nullable: true })
+  metadata: any;
+
+  @ManyToOne(() => Directories, (dir) => dir.files)
+  @JoinColumn({ name: "directoryId" })
+  directory: Directories;
+
+  @Column()
+  directoryId: number;
 
   @CreateDateColumn()
   createdAt: Date;

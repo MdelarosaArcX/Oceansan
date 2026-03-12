@@ -129,7 +129,6 @@ export class CopyRunnerService {
       // new log
       logDoc = await this.scheduleLogsRepo.save(logDoc);
     }
-    // console.log("logDoc.id ==>>", logDoc.id)
     const newFiles = pendingFiles.map((f) => {
       const file = new ScheduleLogFile();
       file.path = f.path;
@@ -193,7 +192,6 @@ export class CopyRunnerService {
       if (pendingFiles.length === 0) return;
 
       // Map pending files to ScheduleLogFile entities
-      // console.log("logDoc ==>>", logDoc)
       
       const newFiles: ScheduleLogFile[] = pendingFiles.map((f) => {
         const file = new ScheduleLogFile();

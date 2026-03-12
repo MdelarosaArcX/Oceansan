@@ -89,7 +89,7 @@ async function resumeInterruptedJobs() {
 // resumeInterruptedJobs();
 
 wss.on("connection", (ws) => {
-  console.log("🔌 Client connected");
+  console.log(" Client connected");
 
   const ramMonitor = new RamMonitorService(broadcast, 1000);
   ramMonitor.start();
@@ -110,7 +110,6 @@ schedulerService.start(); //  REQUIRED
 app.post("/copy/start", async (req, res) => {
   const { from, to, type, jobId, name, recycle, recycle_path, engine } = req.body;
 
-   console.log("req.body ==>",req.body)
   if (!from || !to) {
     return res.status(400).json({ error: "Missing from/to paths" });
   }
@@ -146,7 +145,6 @@ app.post("/copy/start", async (req, res) => {
       engine,
     });
 
-    console.log("doest it go here?")
 
     res.json({ status: "started" });
   } catch (err: any) {
