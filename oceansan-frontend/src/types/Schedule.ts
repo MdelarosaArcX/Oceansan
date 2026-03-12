@@ -26,7 +26,7 @@ export interface SchedulePayload {
 }
 
 export interface BackendSchedule {
-  _id: string;
+  id: string;
   sched_name: string;
   src_path: string;
   dest_path: string;

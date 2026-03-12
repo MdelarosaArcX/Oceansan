@@ -60,6 +60,7 @@ export const useCopyStore = defineStore('copy', {
         speed: '',
         status: 'running',
       };
+      console.log("jobId =>> ",jobId)
 
       await startCopy(from, to, engine, type, jobId, name, recycle, recycle_path);
     },

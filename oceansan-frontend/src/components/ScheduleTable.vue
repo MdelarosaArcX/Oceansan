@@ -247,7 +247,7 @@ async function fetchSchedules() {
     const data: BackendSchedule[] = await getSchedules();
 
     rows.value = data.map((s) => ({
-      id: s._id,
+      id: s.id,
       name: s.sched_name,
       from: s.src_path,
       to: s.dest_path,
@@ -383,6 +383,7 @@ function shortenPath(path: string) {
 const store = useCopyStore();
 
 async function runJob(row: JobRow) {
+  console.log("row ==>>",row)
   await store.startCopy(
     row.id,
     row.name,
