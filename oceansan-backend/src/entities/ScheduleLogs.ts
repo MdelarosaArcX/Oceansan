@@ -23,8 +23,7 @@ export class ScheduleLogs {
   schedule!: Schedule;
 
   @Column({
-    type: "enum",
-    enum: ["archive", "sync"],
+    type: "text",
   })
   type!: "archive" | "sync";
 
@@ -47,15 +46,13 @@ export class ScheduleLogs {
   totalSize!: number;
 
   @Column({
-    type: "enum",
-    enum: ["running", "completed", "failed", "interrupted"],
+    type: "text",
     default: "running",
   })
   status!: JobStatus;
 
   @Column({
-    type: "enum",
-    enum: ["robocopy", "xcopy", "rclone"],
+    type: "text",
   })
   engine!: EngineType;
 

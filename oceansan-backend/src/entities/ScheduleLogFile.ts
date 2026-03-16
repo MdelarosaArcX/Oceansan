@@ -22,8 +22,7 @@ export class ScheduleLogFile {
   size!: number;
 
   @Column({
-    type: "enum",
-    enum: ["copied", "updated", "deleted", "error"],
+    type: "text",
   })
   status!: FileStatus;
 

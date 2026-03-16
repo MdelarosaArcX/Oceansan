@@ -9,12 +9,10 @@ const isDbSync =
   String(process.env.DB_SYNC || "false").toLowerCase() === "true";
 
 export const AppDataSource = new DataSource({
-  type: "mysql",
-  host: process.env.MYSQL_HOST || "localhost",
-  port: Number(process.env.MYSQL_PORT) || 3306,
-  username: process.env.MYSQL_USER || "appuser",
-  password: process.env.MYSQL_PASSWORD || "apppassword",
-  database: process.env.MYSQL_DB || "appdb",
+  type: "sqlite",
+  database:
+    process.env.SQLITE_DB ||
+    path.join(process.cwd(), "data", "app.sqlite"),
 
   synchronize: isDbSync, // use migrations in production
   logging: false,
@@ -23,5 +21,4 @@ export const AppDataSource = new DataSource({
   migrations: [path.join(__dirname, "..", "migrations", "*.{ts,js}")],
   subscribers: [path.join(__dirname, "..", "subscribers", "*.{ts,js}")],
 
-  poolSize: 10,
 });
