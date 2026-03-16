@@ -56,6 +56,10 @@
         "to": "oceansan-backend/dist"
       },
       {
+        "from": "oceansan-backend/license.seed.json",
+        "to": "oceansan-backend/license.seed.json"
+      },
+      {
         "from": "oceansan-backend/node_modules",
         "to": "oceansan-backend/node_modules"
       },

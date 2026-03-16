@@ -14,7 +14,8 @@ export default defineConfig((/* ctx */) => {
     boot: [
       "pinia",
       "dark",
-      "axios"
+      "axios",
+      "license-guard"
     ],
 
     // https://v2.quasar.dev/quasar-cli-vite/quasar-config-file#css

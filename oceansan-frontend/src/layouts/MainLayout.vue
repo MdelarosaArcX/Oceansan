@@ -110,7 +110,7 @@ const menuList = [
     icon: 'monitor',
     label: 'Schedule',
     separator: false,
-    to: '/',
+    to: '/schedule',
   },
   {
     icon: 'history_toggle_off',
