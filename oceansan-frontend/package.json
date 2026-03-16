@@ -11,7 +11,7 @@
     "format": "prettier --write \"**/*.{js,ts,vue,scss,html,md,json}\" --ignore-path .gitignore",
     "test": "echo \"No test specified\" && exit 0",
     "dev": "quasar dev",
-    "build": "quasar build",
+    "build": "quasar build && node scripts/fix-spa-paths.cjs",
     "build:electron": "quasar build --mode electron",
     "postinstall": "quasar prepare"
   },
@@ -19,6 +19,7 @@
     "@quasar/extras": "^1.16.4",
     "axios": "^1.13.2",
     "global": "^4.4.0",
+    "oceansan-electron": "file:..",
     "pinia": "^3.0.4",
     "quasar": "^2.18.6",
     "vue": "^3.5.22",
