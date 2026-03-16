@@ -8,10 +8,12 @@ import { WebSocketServer } from "ws";
 // import CopyService from "./services/copy.service";
 import scheduleRoutes from "./routes/schedule.routes";
 import scheduleLogsRoutes from "./routes/scheduleLogs.routes";
+import licenseRoutes from "./routes/license.routes";
 import schedulerService from "./services/scheduler.service";
 // import Schedule from "./models/Schedule";
 import { CopyRunnerService } from "./services/copy-runner.service";
 import RamMonitorService from "./services/ram-monitor.service";
+import { seedLicensesIfNeeded } from "./services/license-seed.service";
 // import ScheduleLogs from "./models/ScheduleLogs";
 // import { Types } from "mongoose";
 import { AppDataSource } from "./config/typeorm.config";
@@ -25,6 +27,7 @@ AppDataSource.initialize()
   .then(async () => {
     console.log("MySQL connected with TypeORM");
 
+    await seedLicensesIfNeeded();
     await resumeInterruptedJobs();
 
     app.listen(PORT, () => {
@@ -210,6 +213,7 @@ process.on("SIGTERM", async () => {
 
 app.use("/api/schedules", scheduleRoutes);
 app.use("/api/schedulesLogs", scheduleLogsRoutes);
+app.use("/license", licenseRoutes);
 
 /* ---------------- Start Server ---------------- */
 

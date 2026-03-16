@@ -4,6 +4,8 @@ import path from "path";
 import dotenv from "dotenv";
 import { Directories } from "../entities/Directories";
 import { FileMetadata } from "../entities/FileMetadata";
+import { License } from "../entities/License";
+import { LicenseUsage } from "../entities/LicenseUsage";
 import { Schedule } from "../entities/Schedule";
 import { ScheduleLogFile } from "../entities/ScheduleLogFile";
 import { ScheduleLogs } from "../entities/ScheduleLogs";
@@ -25,6 +27,8 @@ export const AppDataSource = new DataSource({
   entities: [
     Directories,
     FileMetadata,
+    License,
+    LicenseUsage,
     Schedule,
     ScheduleLogFile,
     ScheduleLogs,

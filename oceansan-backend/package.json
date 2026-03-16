@@ -14,7 +14,8 @@
     "oceansan:logs": "pm2 logs OceansanBackend",
     "oceansan:delete": "pm2 delete OceansanBackend",
     "oceansan:save": "pm2 save",
-    "watcher:metadata": "ts-node src/scripts/runWatcher.ts"
+    "watcher:metadata": "ts-node src/scripts/runWatcher.ts",
+    "seed:run": "ts-node src/scripts/seed.run.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",
