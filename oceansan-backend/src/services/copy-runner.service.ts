@@ -85,8 +85,8 @@ export class CopyRunnerService {
     const copier = createCopyEngine(engine, this.ws);
 
     const sourceFiles = walkDir(source);
-    const totalBytes = sourceFiles.reduce((s, f) => s + f.size, 0);
-    const totalFiles = sourceFiles.length;
+    let totalBytes = 0;
+    let totalFiles = 0;
 
     // const logDoc = await ScheduleLogs.create({
     //   scheduleId,
@@ -114,8 +114,8 @@ export class CopyRunnerService {
         source,
         destination,
         startTime: new Date(),
-        totalFiles,
-        totalSize: totalBytes,
+        totalFiles: 0,
+        totalSize: 0,
         files: [],
       });
     }
@@ -129,14 +129,6 @@ export class CopyRunnerService {
       // new log
       logDoc = await this.scheduleLogsRepo.save(logDoc);
     }
-    const newFiles = pendingFiles.map((f) => {
-      const file = new ScheduleLogFile();
-      file.path = f.path;
-      file.size = f.size;
-      file.status = f.status;
-      file.log = logDoc;
-      return file;
-    });
 
     let copiedBytes = 0;
 
@@ -186,6 +178,12 @@ export class CopyRunnerService {
       }
     }
 
+    totalFiles = pendingFiles.length;
+    totalBytes = pendingFiles.reduce((s, f) => s + f.size, 0);
+    logDoc.totalFiles = totalFiles;
+    logDoc.totalSize = totalBytes;
+    await this.scheduleLogsRepo.save(logDoc);
+
 
     
     const flushLogs = async () => {
@@ -209,10 +207,6 @@ export class CopyRunnerService {
       // Save files in bulk
       const fileRepo = this.scheduleLogsRepo.manager.getRepository(ScheduleLogFile);
       await fileRepo.save(newFiles);
-
-      // Update the log totals
-      logDoc.totalFiles += newFiles.length;
-      logDoc.totalSize += newFiles.reduce((s, f) => s + f.size, 0);
 
       pendingFiles.length = 0;
 
