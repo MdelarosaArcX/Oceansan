@@ -28,14 +28,12 @@ export class Schedule {
   recycle_path!: string;
 
   @Column({
-    type: "enum",
-    enum: ["sync", "archive"],
+    type: "text",
   })
   type!: ScheduleType;
 
   @Column({
-    type: "enum",
-    enum: ["xcopy", "robocopy", "rclone"],
+    type: "text",
   })
   engine!: EngineType;
 
@@ -43,7 +41,7 @@ export class Schedule {
   time!: string; // HH:mm
 
   @Column({
-    type: "json",
+    type: "simple-json",
   })
   days: number[];
 
