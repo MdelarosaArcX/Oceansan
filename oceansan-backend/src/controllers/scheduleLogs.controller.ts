@@ -1,49 +1,55 @@
+// controllers/scheduleLogs.controller.ts
 import { Request, Response } from "express";
-import ScheduleLogs from "../models/ScheduleLogs";
+import { AppDataSource } from "../config/typeorm.config";
+import { ScheduleLogs } from "../entities/ScheduleLogs";
 
+const scheduleLogsRepo = AppDataSource.getRepository(ScheduleLogs);
 
-/** READ ALL */
+/** READ ALL WITH PAGINATION & SORTING */
 export const getScheduleLogs = async (req: Request, res: Response) => {
-    try {
-        const {
-            page = 1,
-            rowsPerPage = 10,
-            sortBy = 'createdAt',
-            descending = false,
-        } = req.query;
+  try {
+    const {
+      page = 1,
+      rowsPerPage = 10,
+      sortBy = 'createdAt',
+      descending = 'false',
+    } = req.query;
 
-        const pageNumber = Number(page);
-        const limit = Number(rowsPerPage);
-        const skip = (pageNumber - 1) * limit;
+    const pageNumber = Number(page);
+    const limit = Number(rowsPerPage);
+    const skip = (pageNumber - 1) * limit;
+    const descendingStr = String(descending);
+    const order = (descendingStr.toLowerCase() === 'true') ? 'DESC' : 'ASC';
 
-        const sortOrder = descending === 'true' || Boolean(descending) === true ? -1 : 1;
+    const [data, total] = await scheduleLogsRepo.findAndCount({
+      relations: ["files"],
+      order: { [String(sortBy)]: order as "ASC" | "DESC" },
+      skip,
+      take: limit,
+    });
 
-        const [data, total] = await Promise.all([
-            ScheduleLogs.find()
-                .sort({ [String(sortBy)]: sortOrder })
-                .skip(skip)
-                .limit(limit),
-            ScheduleLogs.countDocuments(),
-        ]);
-
-        res.json({
-            data,
-            pagination: {
-                page: pageNumber,
-                rowsPerPage: limit,
-                total,
-                totalPages: Math.ceil(total / limit),
-            },
-        });
-    } catch (error) {
-        res.status(500).json({ message: 'Failed to fetch schedules', error });
-    }
+    res.json({
+      data,
+      pagination: {
+        page: pageNumber,
+        rowsPerPage: limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({ message: 'Failed to fetch schedule logs', error: error.message });
+  }
 };
 
-/** READ ONE */
+/** READ ONE BY ID */
 export const getScheduleLogsById = async (req: Request, res: Response) => {
-    const Logs = await ScheduleLogs.findById(req.params.id);
-    if (!Logs) return res.status(404).json({ message: "Not found" });
-    res.json(Logs);
-};
+  try {
+    const log = await scheduleLogsRepo.findOne({ where: { id: Number(req.params.id) } });
+    if (!log) return res.status(404).json({ message: "Not found" });
 
+    res.json(log);
+  } catch (error: any) {
+    res.status(500).json({ message: "Failed to fetch log", error: error.message });
+  }
+};

@@ -5,14 +5,21 @@ import path from "path";
 // import XcopyService from "./xcopy.service";
 // import RsyncService from "./rsync.service";
 import { createCopyEngine } from "./copy.factory";
-import ScheduleLogs, { ILogsFile } from "../models/ScheduleLogs";
-import Schedule from "../models/Schedule";
+// import ScheduleLogs, { ILogsFile } from "../models/ScheduleLogs";
+// import Schedule from "../models/Schedule";
 import { walkDir } from "../utils/fileWalker";
-import { ScheduleLogger } from "../utils/scheduler.logger";
-import { Types } from "mongoose";
+// import { ScheduleLogger } from "../utils/scheduler.logger";
+// import { Types } from "mongoose";
+import { Repository } from "typeorm";
+import { ScheduleLogs } from "../entities/ScheduleLogs";
+import { ScheduleLogFile } from "../entities/ScheduleLogFile";
 
 type Broadcaster = (data: unknown) => void;
-
+type PendingFile = {
+  path: string;
+  size: number;
+  status: "copied" | "updated" | "deleted";
+};
 //SPEEDEMA
 class SpeedEMA {
   private value = 0;
@@ -51,7 +58,10 @@ function findLargestGrowingFile(
   return currentFile;
 }
 export class CopyRunnerService {
-  constructor(private ws?: Broadcaster) { }
+  constructor(
+    private scheduleLogsRepo: Repository<ScheduleLogs>,
+    private ws?: Broadcaster
+  ) { }
 
   async run({
     scheduleId,
@@ -63,14 +73,14 @@ export class CopyRunnerService {
     option,
     existingLogId
   }: {
-    scheduleId: Types.ObjectId;
+    scheduleId: number;
     type: "archive" | "sync";
     name: string;
     source: string;
     destination: string;
     engine: "robocopy" | "xcopy" | "rclone";
     option?: { recycle: boolean; recycle_path: string };
-    existingLogId?: Types.ObjectId;
+    existingLogId?: number;
   }) {
     const copier = createCopyEngine(engine, this.ws);
 
@@ -92,11 +102,14 @@ export class CopyRunnerService {
     let logDoc;
 
     if (existingLogId) {
-      logDoc = await ScheduleLogs.findById(existingLogId);
+      logDoc = await this.scheduleLogsRepo.findOne({
+        where: { id: existingLogId },
+        relations: ["files"],
+      });
       if (!logDoc) throw new Error("Log not found");
     } else {
-      logDoc = await ScheduleLogs.create({
-        scheduleId,
+      logDoc = this.scheduleLogsRepo.create({
+        schedule: { id: scheduleId } as any,
         type,
         source,
         destination,
@@ -109,9 +122,22 @@ export class CopyRunnerService {
 
     logDoc.status = "running";
     logDoc.engine = engine;
-    await logDoc.save();
+    await this.scheduleLogsRepo.save(logDoc);
 
-    const pendingFiles: ILogsFile[] = [];
+    const pendingFiles: PendingFile[] = [];
+    if (!logDoc.id) {
+      // new log
+      logDoc = await this.scheduleLogsRepo.save(logDoc);
+    }
+    const newFiles = pendingFiles.map((f) => {
+      const file = new ScheduleLogFile();
+      file.path = f.path;
+      file.size = f.size;
+      file.status = f.status;
+      file.log = logDoc;
+      return file;
+    });
+
     let copiedBytes = 0;
 
     const ema = new SpeedEMA();
@@ -160,13 +186,38 @@ export class CopyRunnerService {
       }
     }
 
+
+    
     const flushLogs = async () => {
       if (pendingFiles.length === 0) return;
-      logDoc.files.push(...pendingFiles);
-      logDoc.totalFiles = logDoc.files.length;
-      logDoc.totalSize = logDoc.files.reduce((s, f) => s + f.size, 0);
+
+      // Map pending files to ScheduleLogFile entities
+      
+      const newFiles: ScheduleLogFile[] = pendingFiles.map((f) => {
+        const file = new ScheduleLogFile();
+        file.path = f.path;
+        file.size = f.size;
+        file.status = f.status;
+
+        // Important: attach the ScheduleLogs relation
+        file.log = logDoc;  // this sets log_id automatically due to the relation
+        return file;
+      });
+
+      logDoc.files.push(...newFiles);
+
+      // Save files in bulk
+      const fileRepo = this.scheduleLogsRepo.manager.getRepository(ScheduleLogFile);
+      await fileRepo.save(newFiles);
+
+      // Update the log totals
+      logDoc.totalFiles += newFiles.length;
+      logDoc.totalSize += newFiles.reduce((s, f) => s + f.size, 0);
+
       pendingFiles.length = 0;
-      await logDoc.save();
+
+      // Save the updated log
+      await this.scheduleLogsRepo.save(logDoc);
     };
 
     this.ws?.({
@@ -179,8 +230,8 @@ export class CopyRunnerService {
     // --- Start copy/sync ---
     const runPromise =
       type === "archive"
-        ?  copier.archive(source, destination)
-        :  copier.sync(source, destination, option);
+        ? copier.archive(source, destination)
+        : copier.sync(source, destination, option);
 
     // --- Monitor progress ---
     const monitorInterval = setInterval(() => {
@@ -239,7 +290,7 @@ export class CopyRunnerService {
 
       logDoc.endTime = new Date();
       logDoc.status = "completed";
-      await logDoc.save();
+      await this.scheduleLogsRepo.save(logDoc);
 
       const durationSeconds = Math.floor((Date.now() - startedAt) / 1000);
       const avgSpeed = durationSeconds > 0 ? totalBytes / durationSeconds : 0;
@@ -255,7 +306,7 @@ export class CopyRunnerService {
     } catch (err: any) {
       clearInterval(monitorInterval);
       logDoc.status = "interrupted";
-      await logDoc.save();
+      await this.scheduleLogsRepo.save(logDoc);
       this.ws?.({
         type: "error",
         message: err.message,
