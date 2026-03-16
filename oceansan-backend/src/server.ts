@@ -35,9 +35,26 @@ AppDataSource.initialize()
     console.error("TypeORM connection error:", err);
   });
 
+const allowedOrigins = new Set([
+  "http://localhost:9000",
+  "http://localhost:5173",
+]);
+
 app.use(
   cors({
-    origin: ["http://localhost:9000", "http://localhost:5173"],
+    origin: (origin, callback) => {
+      if (!origin || origin === "null" || origin.startsWith("file://")) {
+        callback(null, true);
+        return;
+      }
+
+      if (allowedOrigins.has(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error(`Origin not allowed by CORS: ${origin}`));
+    },
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,

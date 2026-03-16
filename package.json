@@ -1,0 +1,71 @@
+{
+  "name": "oceansan-electron",
+  "version": "0.0.1",
+  "description": "Electron shell for OceanSAN frontend and backend",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "build:backend": "npm --prefix oceansan-backend run build",
+    "build:frontend": "npm --prefix oceansan-frontend run build",
+    "build": "npm run build:backend && npm run build:frontend",
+    "pack": "npm run build && electron-builder --dir",
+    "dist": "npm run build && electron-builder",
+    "dev": "electron .",
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^40.1.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.arcxsolutions.oceansan",
+    "productName": "OceanSAN",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "oceansan-frontend/dist/spa",
+        "to": "oceansan-frontend/dist/spa"
+      },
+      {
+        "from": "oceansan-backend/dist",
+        "to": "oceansan-backend/dist"
+      },
+      {
+        "from": "oceansan-backend/node_modules",
+        "to": "oceansan-backend/node_modules"
+      },
+      {
+        "from": "oceansan-backend/package.json",
+        "to": "oceansan-backend/package.json"
+      },
+      {
+        "from": "oceansan-backend/.env",
+        "to": "oceansan-backend/.env"
+      }
+    ]
+  }
+}

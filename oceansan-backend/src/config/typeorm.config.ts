@@ -1,5 +1,12 @@
 import "reflect-metadata";
 import { DataSource } from "typeorm";
+import path from "path";
+import dotenv from "dotenv";
+
+
+dotenv.config();
+const isDbSync =
+  String(process.env.DB_SYNC || "false").toLowerCase() === "true";
 
 export const AppDataSource = new DataSource({
   type: "mysql",
@@ -9,12 +16,12 @@ export const AppDataSource = new DataSource({
   password: process.env.MYSQL_PASSWORD || "apppassword",
   database: process.env.MYSQL_DB || "appdb",
 
-  synchronize: true, // use migrations in production
+  synchronize: isDbSync, // use migrations in production
   logging: false,
 
-  entities: ["src/entities/**/*.ts"],
-  migrations: ["src/migrations/**/*.ts"],
-  subscribers: ["src/subscribers/**/*.ts"],
+  entities: [path.join(__dirname, "..", "entities", "*.{ts,js}")],
+  migrations: [path.join(__dirname, "..", "migrations", "*.{ts,js}")],
+  subscribers: [path.join(__dirname, "..", "subscribers", "*.{ts,js}")],
 
   poolSize: 10,
 });
