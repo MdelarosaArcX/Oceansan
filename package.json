@@ -24,6 +24,7 @@
       "output": "dist"
     },
     "win": {
+      "icon": "logo.ico",
       "target": [
         {
           "target": "nsis",
@@ -34,6 +35,9 @@
       ]
     },
     "nsis": {
+      "installerIcon": "logo.ico",
+      "uninstallerIcon": "logo.ico",
+      "installerHeaderIcon": "logo.ico",
       "oneClick": false,
       "perMachine": true,
       "allowToChangeInstallationDirectory": true,

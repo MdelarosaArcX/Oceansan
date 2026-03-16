@@ -117,6 +117,13 @@ function startBackend() {
   if (app.isPackaged) {
     const backendDir = getBackendDir();
     const serverPath = path.join(backendDir, 'dist', 'server.js');
+    const userDataDir = app.getPath('userData');
+    const sqliteDir = path.join(userDataDir, 'oceansan-backend', 'data');
+    const sqlitePath = path.join(sqliteDir, 'app.sqlite');
+
+    if (!fs.existsSync(sqliteDir)) {
+      fs.mkdirSync(sqliteDir, { recursive: true });
+    }
 
     if (!fs.existsSync(serverPath)) {
       dialog.showErrorBox(
@@ -131,7 +138,10 @@ function startBackend() {
       [serverPath],
       backendDir,
       'backend',
-      { ELECTRON_RUN_AS_NODE: '1' },
+      {
+        ELECTRON_RUN_AS_NODE: '1',
+        SQLITE_DB: sqlitePath,
+      },
     );
     return;
   }
