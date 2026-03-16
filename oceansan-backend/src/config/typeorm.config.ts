@@ -2,6 +2,11 @@ import "reflect-metadata";
 import { DataSource } from "typeorm";
 import path from "path";
 import dotenv from "dotenv";
+import { Directories } from "../entities/Directories";
+import { FileMetadata } from "../entities/FileMetadata";
+import { Schedule } from "../entities/Schedule";
+import { ScheduleLogFile } from "../entities/ScheduleLogFile";
+import { ScheduleLogs } from "../entities/ScheduleLogs";
 
 
 dotenv.config();
@@ -17,7 +22,13 @@ export const AppDataSource = new DataSource({
   synchronize: isDbSync, // use migrations in production
   logging: false,
 
-  entities: [path.join(__dirname, "..", "entities", "*.{ts,js}")],
+  entities: [
+    Directories,
+    FileMetadata,
+    Schedule,
+    ScheduleLogFile,
+    ScheduleLogs,
+  ],
   migrations: [path.join(__dirname, "..", "migrations", "*.{ts,js}")],
   subscribers: [path.join(__dirname, "..", "subscribers", "*.{ts,js}")],
 

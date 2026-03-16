@@ -9,7 +9,7 @@
     "build:frontend": "npm --prefix oceansan-frontend run build",
     "build": "npm run build:backend && npm run build:frontend",
     "pack": "npm run build && electron-builder --dir",
-    "dist": "npm run build && electron-builder",
+    "dist": "npm install && npm run build && electron-builder",
     "dev": "electron .",
     "start": "electron ."
   },

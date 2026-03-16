@@ -222,7 +222,12 @@ app.whenReady().then(async () => {
         safePath = safePath.slice('index.html/'.length);
       }
 
-      const filePath = path.join(spaRoot, safePath || 'index.html');
+      let filePath = path.join(spaRoot, safePath || 'index.html');
+
+      if (!fs.existsSync(filePath)) {
+        filePath = path.join(spaRoot, 'index.html');
+      }
+
       callback({ path: filePath });
     });
   }

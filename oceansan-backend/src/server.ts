@@ -43,7 +43,12 @@ const allowedOrigins = new Set([
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || origin === "null" || origin.startsWith("file://")) {
+      if (
+        !origin ||
+        origin === "null" ||
+        origin.startsWith("file://") ||
+        origin.startsWith("app://")
+      ) {
         callback(null, true);
         return;
       }
