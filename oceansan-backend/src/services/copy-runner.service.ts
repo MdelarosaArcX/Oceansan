@@ -13,6 +13,8 @@ import { walkDir } from "../utils/fileWalker";
 import { Repository } from "typeorm";
 import { ScheduleLogs } from "../entities/ScheduleLogs";
 import { ScheduleLogFile } from "../entities/ScheduleLogFile";
+import { AppDataSource } from "../config/typeorm.config";
+import { Schedule } from "../entities/Schedule";
 
 type Broadcaster = (data: unknown) => void;
 type PendingFile = {
@@ -285,6 +287,15 @@ export class CopyRunnerService {
       logDoc.endTime = new Date();
       logDoc.status = "completed";
       await this.scheduleLogsRepo.save(logDoc);
+
+      if (AppDataSource.isInitialized) {
+        const scheduleRepo = AppDataSource.getRepository(Schedule);
+        const update =
+          type === "archive"
+            ? { last_archived: new Date() }
+            : { last_sync: new Date() };
+        await scheduleRepo.update({ id: scheduleId }, update);
+      }
 
       const durationSeconds = Math.floor((Date.now() - startedAt) / 1000);
       const avgSpeed = durationSeconds > 0 ? totalBytes / durationSeconds : 0;
