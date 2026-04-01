@@ -26,25 +26,29 @@ class SchedulerService {
     const scheduleLogsRepo = AppDataSource.getRepository(ScheduleLogs);
 
     cron.schedule("* * * * *", async () => {
-      const now = new Date();
-      const hhmm = now.toTimeString().slice(0, 5);
-      const today = now.getDay();
+      try {
+        const now = new Date();
+        const hhmm = now.toTimeString().slice(0, 5);
+        const today = now.getDay();
 
-      const schedules = await scheduleRepo.find({
-        where: {
-          active: true,
-          time: hhmm,
-        },
-      });
+        const schedules = await scheduleRepo.find({
+          where: {
+            active: true,
+            time: hhmm,
+          },
+        });
 
-      for (const schedule of schedules) {
-        if (!schedule.days.includes(today)) continue;
+        for (const schedule of schedules) {
+          if (!schedule.days.includes(today)) continue;
 
-        const id = schedule.id;
+          const id = schedule.id;
 
-        if (this.running.has(id)) continue;
+          if (this.running.has(id)) continue;
 
-        this.runSchedule(schedule, scheduleRepo, scheduleLogsRepo);
+          void this.runSchedule(schedule, scheduleRepo, scheduleLogsRepo);
+        }
+      } catch (error) {
+        console.error("Scheduler tick failed:", error);
       }
     });
 
@@ -81,13 +85,17 @@ class SchedulerService {
       this.running.delete(id);
     }
 
-    if (schedule.type === "archive") {
-      schedule.last_archived = new Date();
-    } else {
-      schedule.last_sync = new Date();
-    }
+    try {
+      if (schedule.type === "archive") {
+        schedule.last_archived = new Date();
+      } else {
+        schedule.last_sync = new Date();
+      }
 
-    await scheduleRepo.save(schedule);
+      await scheduleRepo.save(schedule);
+    } catch (error) {
+      console.error(`Failed to update schedule metadata for ${id}:`, error);
+    }
   }
 }
 

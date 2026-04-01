@@ -71,44 +71,67 @@ app.use(
 app.use(express.json());
 
 const PORT = 3000;
+let httpServerStarted = false;
 
 /* ---------------- WebSocket ---------------- */
 
 const wss = new WebSocketServer({ port: 3001 });
 
 function broadcast(data: unknown) {
-  const payload = JSON.stringify(data);
-  wss.clients.forEach((client) => {
-    if (client.readyState === 1) {
-      client.send(payload);
-    }
-  });
+  try {
+    const payload = JSON.stringify(data);
+    wss.clients.forEach((client) => {
+      if (client.readyState === 1) {
+        try {
+          client.send(payload);
+        } catch (error) {
+          console.error("WebSocket send failed:", error);
+        }
+      }
+    });
+  } catch (error) {
+    console.error("Broadcast failed:", error);
+  }
 }
 
 async function resumeInterruptedJobs() {
-  const scheduleLogsRepo = AppDataSource.getRepository(ScheduleLogs);
+  try {
+    const scheduleLogsRepo = AppDataSource.getRepository(ScheduleLogs);
 
-  const jobs = await scheduleLogsRepo.find({
-    where: { status: "interrupted" },
-    order: { startTime: "ASC" },
-  });
+    const jobs = await scheduleLogsRepo.find({
+      where: { status: "interrupted" },
+      relations: ["schedule"],
+      order: { startTime: "ASC" },
+    });
 
-  for (const job of jobs) {
-    console.log("Resuming:", job.id);
+    for (const job of jobs) {
+      try {
+        if (!job.schedule?.id) {
+          console.warn(`Skipping interrupted job ${job.id}: missing schedule relation`);
+          continue;
+        }
 
-    const runner = new CopyRunnerService(scheduleLogsRepo, broadcast);
+        console.log("Resuming:", job.id);
 
-    runner
-      .run({
-        scheduleId: job.schedule.id,
-        type: job.type,
-        name: "Recovered Job",
-        source: job.source,
-        destination: job.destination,
-        engine: job.engine,
-        existingLogId: job.id,
-      })
-      .catch(console.error);
+        const runner = new CopyRunnerService(scheduleLogsRepo, broadcast);
+
+        void runner.run({
+          scheduleId: job.schedule.id,
+          type: job.type,
+          name: "Recovered Job",
+          source: job.source,
+          destination: job.destination,
+          engine: job.engine,
+          existingLogId: job.id,
+        }).catch((error) => {
+          console.error(`Failed to resume interrupted job ${job.id}:`, error);
+        });
+      } catch (error) {
+        console.error(`Error while scheduling interrupted job ${job.id}:`, error);
+      }
+    }
+  } catch (error) {
+    console.error("Failed to resume interrupted jobs:", error);
   }
 }
 // resumeInterruptedJobs();
@@ -129,7 +152,11 @@ console.log("WebSocket running on ws://localhost:3001");
 /* ---------------- Scheduler ---------------- */
 
 schedulerService.setBroadcaster(broadcast); // optional but useful
-schedulerService.start(); //  REQUIRED
+try {
+  schedulerService.start(); //  REQUIRED
+} catch (error) {
+  console.error("Scheduler failed to start:", error);
+}
 
 /* ---------------- REST APIs ---------------- */
 app.post("/copy/start", async (req, res) => {
@@ -177,8 +204,10 @@ app.post("/copy/start", async (req, res) => {
   }
 });
 
-process.on("SIGINT", async () => {
-  console.log("Server shutting down...");
+async function markRunningJobsInterrupted() {
+  if (!AppDataSource.isInitialized) {
+    return;
+  }
 
   const repo = AppDataSource.getRepository(ScheduleLogs);
 
@@ -188,21 +217,23 @@ process.on("SIGINT", async () => {
     .set({ status: "interrupted" })
     .where("status = :status", { status: "running" })
     .execute();
+}
 
-  process.exit();
+process.on("SIGINT", async () => {
+  console.log("Server shutting down...");
+
+  try {
+    await markRunningJobsInterrupted();
+  } catch (error) {
+    console.error("Failed to update running jobs during SIGINT:", error);
+  } finally {
+    process.exit();
+  }
 });
 
 process.on("SIGTERM", async () => {
   try {
-    const repo = AppDataSource.getRepository(ScheduleLogs);
-
-    await repo
-      .createQueryBuilder()
-      .update(ScheduleLogs)
-      .set({ status: "interrupted" })
-      .where("status = :status", { status: "running" })
-      .execute();
-
+    await markRunningJobsInterrupted();
     console.log("All running jobs marked as interrupted.");
   } catch (err) {
     console.error("Failed to update running jobs:", err);
@@ -211,12 +242,16 @@ process.on("SIGTERM", async () => {
   }
 });
 
+process.on("uncaughtException", (error) => {
+  console.error("Uncaught exception:", error);
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled rejection:", reason);
+});
+
 app.use("/api/schedules", scheduleRoutes);
 app.use("/api/schedulesLogs", scheduleLogsRoutes);
 app.use("/license", licenseRoutes);
 
 /* ---------------- Start Server ---------------- */
-
-app.listen(PORT, () => {
-  console.log(`API running on http://localhost:${PORT}`);
-});

@@ -47,6 +47,7 @@
     "files": [
       "main.js",
       "preload.js",
+      "logo.ico",
       "package.json",
       "oceansan-frontend/dist/spa/**"
     ],
