@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import path from 'path';
 import os from 'os';
 import { fileURLToPath } from 'url'
@@ -49,6 +49,14 @@ async function createWindow() {
     mainWindow = undefined;
   });
 }
+
+ipcMain.handle('dialog:openDirectory', async () => {
+  const result = await dialog.showOpenDialog({
+    properties: ['openDirectory'],
+  });
+  if (result.canceled) return null;
+  return result.filePaths[0] ?? null;
+});
 
 void app.whenReady().then(createWindow);
 

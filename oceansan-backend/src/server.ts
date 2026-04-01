@@ -8,6 +8,7 @@ import { WebSocketServer } from "ws";
 // import CopyService from "./services/copy.service";
 import scheduleRoutes from "./routes/schedule.routes";
 import scheduleLogsRoutes from "./routes/scheduleLogs.routes";
+import backupRoutes from "./routes/backup.routes";
 import schedulerService from "./services/scheduler.service";
 // import Schedule from "./models/Schedule";
 import { CopyRunnerService } from "./services/copy-runner.service";
@@ -210,6 +211,7 @@ process.on("SIGTERM", async () => {
 
 app.use("/api/schedules", scheduleRoutes);
 app.use("/api/schedulesLogs", scheduleLogsRoutes);
+app.use("/api/backup", backupRoutes);
 
 /* ---------------- Start Server ---------------- */
 
