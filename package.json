@@ -1,0 +1,77 @@
+{
+  "name": "oceansan-electron",
+  "version": "1.0.0",
+  "description": "Electron shell for OceanSAN frontend and backend",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "build:backend": "npm --prefix oceansan-backend run build",
+    "build:frontend": "npm --prefix oceansan-frontend run build",
+    "build": "npm run build:backend && npm run build:frontend",
+    "pack": "npm run build && electron-builder --dir",
+    "dist": "npm install && npm run build && electron-builder",
+    "dev": "electron .",
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^40.1.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.arcxsolutions.oceansan",
+    "productName": "OceanSAN",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "icon": "logo.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "installerIcon": "logo.ico",
+      "uninstallerIcon": "logo.ico",
+      "installerHeaderIcon": "logo.ico",
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "logo.ico",
+      "package.json",
+      "oceansan-frontend/dist/spa/**"
+    ],
+    "extraResources": [
+      {
+        "from": "oceansan-backend/dist",
+        "to": "oceansan-backend/dist"
+      },
+      {
+        "from": "oceansan-backend/license.seed.json",
+        "to": "oceansan-backend/license.seed.json"
+      },
+      {
+        "from": "oceansan-backend/node_modules",
+        "to": "oceansan-backend/node_modules"
+      },
+      {
+        "from": "oceansan-backend/package.json",
+        "to": "oceansan-backend/package.json"
+      },
+      {
+        "from": "oceansan-backend/.env",
+        "to": "oceansan-backend/.env"
+      }
+    ]
+  }
+}

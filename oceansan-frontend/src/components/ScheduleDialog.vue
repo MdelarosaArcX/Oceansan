@@ -46,12 +46,27 @@
                 <div class="text-subtitle2">Basic Information</div>
 
                 <q-select
-                  v-model="form.type"
-                  :rules="[(val) => !!val || 'Schedule Type is required']"
+                  v-model="form.engine"
+                  :rules="[(val) => requiredRule(val) || 'Engine is required']"
                   :options="[
-                    { value: 'archive', label: 'Archive' },
-                    { value: 'sync', label: 'Sync' },
+                    { value: 'robocopy', label: 'Robocopy' },
+                    { value: 'xcopy', label: 'XCopy' },
+                    { value: 'rclone', label: 'Rclone' },
                   ]"
+                  option-value="value"
+                  option-label="label"
+                  emit-value
+                  map-options
+                  outlined
+                  dense
+                  required
+                  label="Engine"
+                />
+
+                <q-select
+                  v-model="form.type"
+                  :rules="[(val) => requiredRule(val) || 'Schedule Type is required']"
+                  :options="scheduleTypeOptions"
                   option-value="value"
                   option-label="label"
                   emit-value
@@ -67,8 +82,15 @@
                   outlined
                   dense
                   label="Schedule Name"
-                  :rules="[(val) => !!val || 'Name is required']"
+                  :rules="[(val) => requiredRule(val) || 'Name is required']"
                   required
+                />
+                <q-checkbox
+                  v-if="form.type === 'sync'"
+                  v-model="form.recycle"
+                  :indeterminate="indeterminate"
+                  label="Recycle deleted sync file?"
+                  color="cyan"
                 />
               </q-card>
 
@@ -76,32 +98,24 @@
               <q-card flat bordered class="q-pa-md q-gutter-md">
                 <div class="text-subtitle2">Paths</div>
 
-                <q-input
+                <FolderPicker
                   v-model="form.src_path"
-                  outlined
-                  dense
-                  icon="folder"
                   label="Source Folder"
-                  :rules="[(val) => !!val || 'Source path is required']"
-                  required
-                >
-                <template #prepend>
-                    <q-icon name="folder" />
-                  </template>
-                </q-input>
+                  :rules="[sourcePathRule]"
+                />
 
-                <q-input
+                <FolderPicker
                   v-model="form.dest_path"
-                  outlined
-                  dense
                   label="Destination Folder"
-                  :rules="[(val) => !!val || 'Destination path is required']"
-                  required
-                >
-                  <template #prepend>
-                    <q-icon name="folder" />
-                  </template>
-                </q-input>
+                  :rules="[destinationRequiredRule, destinationDiffRule]"
+                />
+
+                <FolderPicker
+                  v-if="form.recycle && form.type === 'sync'"
+                  v-model="form.recycle_path"
+                  label="Recycle Folder"
+                  :rules="[recyclePathRule]"
+                />
               </q-card>
 
               <!-- Schedule -->
@@ -184,6 +198,7 @@
 </template>
 
 <script setup lang="ts">
+import FolderPicker from 'src/components/FolderPicker.vue';
 import type { SchedulePayload } from 'src/types/Schedule';
 import { computed, reactive, ref, watch } from 'vue';
 import { DAY_OPTIONS } from 'src/constants/days';
@@ -194,7 +209,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void;
-  (e: 'submit', value: SchedulePayload): void;
+  (e: 'submit', value: SchedulePayload): Promise<boolean>; // now async
 }>();
 
 const isEdit = computed(() => !!props.data?.id);
@@ -203,8 +218,11 @@ const form = reactive<SchedulePayload>({
   name: '',
   src_path: '',
   dest_path: '',
+  recycle_path: '',
   sched: [],
   time: '',
+  recycle: false,
+  engine: '',
   type: 'archive',
   status: false,
 });
@@ -220,8 +238,34 @@ const form = reactive<SchedulePayload>({
 // ];
 
 const checkedAll = ref<boolean>(false);
+// const recycle = ref<boolean>(false);
 const indeterminate = ref(false);
 
+const scheduleTypeOptions = computed(() => [
+  { value: "archive", label: "Archive" },
+  {
+    value: "sync",
+    label: "Sync",
+    disable: form.engine === "xcopy",
+  },
+]);
+
+const requiredRule = (val: string | number | null | undefined) => !!val;
+const sourcePathRule = (val: string | null | undefined) => !!val || 'Source path is required';
+const destinationRequiredRule = (val: string | null | undefined) =>
+  !!val || 'Destination path is required';
+const destinationDiffRule = (val: string | null | undefined) =>
+  val !== form.src_path || 'Destination must be different from Source';
+const recyclePathRule = (val: string | null | undefined) => !!val || 'Recycle path is required';
+
+watch(
+  () => form.engine,
+  (newVal) => {
+    if (newVal === "xcopy" && form.type === "sync") {
+      form.type = "archive";
+    }
+  }
+);
 watch(
   () => props.data,
   (val) => {
@@ -257,20 +301,29 @@ watch(
   { deep: true },
 );
 
-function submit() {
-  emit('submit', { ...form });
+async function submit() {
+  // Wait for parent to handle saving
+  const success = await emit('submit', { ...form });
   reset();
-  close();
+
+  // Only close if parent says it succeeded
+  if (success) {
+    reset();
+    close();
+  }
 }
+
 const allDayValues = DAY_OPTIONS.map((d) => d.value);
 
 function reset() {
   Object.assign(form, {
     id: undefined,
     type: '',
+    engine: '',
     name: '',
     src_path: '',
     dest_path: '',
+    recycle_path: '',
     sched: [],
     time: '',
   });

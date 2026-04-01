@@ -8,7 +8,9 @@
 
       <q-btn
         unelevated
-        :class="$q.dark.isActive ? 'bg-accent  text-base-dark-3' : 'bg-base-dark-2 text-base-light-1'"
+        :class="
+          $q.dark.isActive ? 'bg-accent  text-base-dark-3' : 'bg-base-dark-2 text-base-light-1'
+        "
         icon="add_circle"
         rounded
         label="Create Schedule"
@@ -55,23 +57,31 @@
       <!-- Status column -->
       <template #body-cell-status="props">
         <q-td :props="props">
-          <div v-if="store.runningJobId !== props.row.id" class="status-cell">
+          <div
+            v-if="!store.jobs[props.row.id] || store.jobs[props.row.id]?.status === 'complete'"
+            class="status-cell"
+          >
             <q-chip dense rounded :color="statusColor(props.value)" text-color="white">
               {{ props.value }}
             </q-chip>
           </div>
 
           <div v-else class="progress-cell">
+            <q-chip dense rounded color="red" text-color="white"> Running </q-chip>
             <q-linear-progress
-              :value="store.percent / 100"
-              rounded
               stripe
-              animated
-              size="14px"
+              rounded
+              size="20px"
+              v-if="store.jobs[props.row.id]?.percent && props.row.engine === 'rclone'"
+              :value="store.jobs[props.row.id]?.percent"
               color="primary"
-            />
-            <div class="text-caption text-grey q-mt-xs ellipsis">
-              {{ store.percent }}% — {{ store.currentFile }}
+              class="q-mt-sm"
+              ><div class="absolute-full flex flex-center">
+                <q-badge text-color="white" color="primary" :label="store.jobs[props.row.id]?.speed" />
+              </div>
+            </q-linear-progress>
+            <div class="text-caption text-grey q-mt-xs ellipsis" v-if="props.row.engine !== 'rclone'">
+              est. {{ store.jobs[props.row.id]?.speed }}
             </div>
           </div>
         </q-td>
@@ -81,11 +91,26 @@
       <template #body-cell-action="props">
         <q-td :props="props">
           <div class="action-cell">
-            <q-btn dense flat round icon="play_arrow" color="primary" @click="runJob(props.row)">
+            <q-btn
+              :disable="store.jobs[props.row.id]?.status === 'running'"
+              dense
+              flat
+              round
+              icon="play_arrow"
+              color="primary"
+              @click="runJob(props.row)"
+            >
               <q-tooltip>Run</q-tooltip>
             </q-btn>
 
-            <q-btn dense flat round icon="edit" :color="$q.dark.isActive ? 'accent' : 'base-dark-2'" @click="openEdit(props.row)">
+            <q-btn
+              dense
+              flat
+              round
+              icon="edit"
+              :color="$q.dark.isActive ? 'accent' : 'base-dark-2'"
+              @click="openEdit(props.row)"
+            >
               <q-tooltip>Edit</q-tooltip>
             </q-btn>
 
@@ -108,6 +133,7 @@ import {
   updateSchedule,
 } from 'src/services/schedule.service';
 import type { QTableColumn } from 'quasar';
+import { useQuasar } from 'quasar';
 import { onMounted, ref } from 'vue';
 import ScheduleDialog from './ScheduleDialog.vue';
 import type { BackendSchedule, SchedulePayload } from 'src/types/Schedule';
@@ -120,14 +146,17 @@ interface JobRow {
   name: string;
   from: string;
   to: string;
+  recycle_path: string;
   last_archived?: string | null;
   last_sync?: string | null;
   sched: number[];
   time: string;
+  engine: string;
   type: 'sync' | 'archive';
+  recycle: boolean;
   status: 'Active' | 'In-active';
 }
-
+const $q = useQuasar();
 const dialog = ref(false);
 const selectedSchedule = ref<SchedulePayload | null>(null);
 
@@ -152,7 +181,7 @@ const columns: QTableColumn<JobRow>[] = [
     style: 'max-width: 260px',
     sortable: true,
   },
-  // ✅ NEW SCHEDULE COLUMN
+
   {
     name: 'sched',
     label: 'Days',
@@ -211,20 +240,24 @@ const columns: QTableColumn<JobRow>[] = [
 ];
 
 const rows = ref<JobRow[]>([]);
+const formError = ref('');
 
 async function fetchSchedules() {
   try {
     const data: BackendSchedule[] = await getSchedules();
 
     rows.value = data.map((s) => ({
-      id: s._id,
+      id: s.id,
       name: s.sched_name,
       from: s.src_path,
       to: s.dest_path,
+      recycle_path: s.recycle_path ?? '',
       sched: s.days ?? [],
       last_archived: s.last_archived ?? '',
       last_sync: s.last_sync ?? '',
+      engine: s.engine,
       type: s.type,
+      recycle: s.recycle,
       status: s.active ? 'Active' : 'In-active',
       time: s.time,
     }));
@@ -264,49 +297,81 @@ function openEdit(row: JobRow) {
     name: row.name,
     src_path: row.from,
     dest_path: row.to,
+    engine: row.engine,
+    recycle_path: row.recycle_path,
     sched: row.sched,
     type: row.type,
     time: row.time,
+    recycle: row.recycle,
     status: row.status === 'Active' ? true : false,
   };
   dialog.value = true;
+  // console.log(selectedSchedule.value)
 }
 
 // After creating a schedule, refresh the table
 async function saveSchedule(payload: SchedulePayload) {
-  if (payload.id) {
-    await updateSchedule({
-      id: payload.id,
-      sched_name: payload.name,
-      src_path: payload.src_path,
-      dest_path: payload.dest_path,
-      days: payload.sched.map(Number),
-      type: payload.type,
-      time: payload.time,
-      active: payload.status,
-    });
-    console.log('Update schedule', payload);
-    await fetchSchedules();
-    return;
-  }
+  formError.value = '';
 
   try {
+    if (payload.id) {
+      await updateSchedule({
+        id: payload.id,
+        sched_name: payload.name,
+        src_path: payload.src_path,
+        dest_path: payload.dest_path,
+        recycle_path: payload.recycle_path || '',
+        days: payload.sched.map(Number),
+        engine: payload.engine,
+        type: payload.type,
+        time: payload.time,
+        recycle: payload.recycle,
+        active: payload.status,
+      });
+
+      $q.notify({
+        type: 'success',
+        message: 'Schedule Updated !',
+      });
+      await fetchSchedules();
+      dialog.value = false;
+      return;
+    }
+
     await createSchedule({
       sched_name: payload.name,
       src_path: payload.src_path,
       dest_path: payload.dest_path,
+      recycle_path: payload.recycle_path || '',
       days: payload.sched.map(Number),
+      engine: payload.engine,
       type: payload.type,
       time: payload.time,
+      recycle: payload.recycle,
       active: true,
     });
 
-    console.log('Schedule created');
+    $q.notify({
+      type: 'success',
+      message: 'Schedule Created !',
+    });
 
-    // Refresh table
     await fetchSchedules();
-  } catch (err) {
-    console.error('Failed to create schedule', err);
+    dialog.value = false;
+    selectedSchedule.value = null;
+  } catch (err: unknown) {
+    console.log(err, 'err');
+    const message = err instanceof Error ? err.message : 'Failed to save schedule';
+
+    formError.value = message;
+
+    $q.notify({
+      type: 'negative',
+      message,
+    });
+
+    console.error('Failed to create/update schedule', err);
+    return false;
   }
 }
 
@@ -318,7 +383,17 @@ function shortenPath(path: string) {
 const store = useCopyStore();
 
 async function runJob(row: JobRow) {
-  await store.startCopy(row.id, row.from, row.to, row.type);
+  console.log("row ==>>",row)
+  await store.startCopy(
+    row.id,
+    row.name,
+    row.from,
+    row.to,
+    row.engine,
+    row.type,
+    row.recycle,
+    row.recycle_path,
+  );
   // Refresh table
   await fetchSchedules();
 }

@@ -5,9 +5,10 @@ export interface ScheduleData {
   to: string;
   last_archived: string;
   type: 'sync' | 'archive';
+  recycle: boolean;
   status: 'Active' | 'In-active';
-  sched?: string;   // optional
-  time?: string;    // optional
+  sched?: string; // optional
+  time?: string; // optional
 }
 
 export interface SchedulePayload {
@@ -15,20 +16,26 @@ export interface SchedulePayload {
   name: string;
   src_path: string;
   dest_path: string;
+  recycle_path?: string;
   sched: number[];
+  engine: string;
   type: 'sync' | 'archive';
   time: string;
+  recycle: boolean;
   status: boolean;
 }
 
 export interface BackendSchedule {
-  _id: string;
+  id: string;
   sched_name: string;
   src_path: string;
   dest_path: string;
+  recycle_path?: string;
   days: number[];
+  engine: string;
   type: 'sync' | 'archive';
   time: string;
+  recycle: boolean;
   active: boolean;
   last_archived?: string; // optional
   last_sync?: string; // optional

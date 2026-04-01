@@ -2,12 +2,21 @@ import type { RouteRecordRaw } from 'vue-router';
 
 const routes: RouteRecordRaw[] = [
   {
+    path: '/',
+    redirect: '/license',
+  },
+  {
+    path: '/license',
+    component: () => import('layouts/LicenseLayout.vue'),
+    children: [{ path: '', component: () => import('pages/LicensePage.vue') }],
+  },
+  {
     path: '/dashboard',
     component: () => import('layouts/MainLayout.vue'),
     children: [{ path: '', component: () => import('pages/DashboardPage.vue') }],
   },
   {
-    path: '/',
+    path: '/schedule',
     component: () => import('layouts/MainLayout.vue'),
     children: [{ path: '', component: () => import('pages/SchedulePage.vue') }],
   },

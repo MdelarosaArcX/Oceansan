@@ -1,0 +1,39 @@
+import "reflect-metadata";
+import { DataSource } from "typeorm";
+import path from "path";
+import dotenv from "dotenv";
+import { Directories } from "../entities/Directories";
+import { FileMetadata } from "../entities/FileMetadata";
+import { License } from "../entities/License";
+import { LicenseUsage } from "../entities/LicenseUsage";
+import { Schedule } from "../entities/Schedule";
+import { ScheduleLogFile } from "../entities/ScheduleLogFile";
+import { ScheduleLogs } from "../entities/ScheduleLogs";
+
+
+dotenv.config();
+const isDbSync =
+  String(process.env.DB_SYNC || "false").toLowerCase() === "true";
+
+export const AppDataSource = new DataSource({
+  type: "sqlite",
+  database:
+    process.env.SQLITE_DB ||
+    path.join(process.cwd(), "data", "app.sqlite"),
+
+  synchronize: isDbSync, // use migrations in production
+  logging: false,
+
+  entities: [
+    Directories,
+    FileMetadata,
+    License,
+    LicenseUsage,
+    Schedule,
+    ScheduleLogFile,
+    ScheduleLogs,
+  ],
+  migrations: [path.join(__dirname, "..", "migrations", "*.{ts,js}")],
+  subscribers: [path.join(__dirname, "..", "subscribers", "*.{ts,js}")],
+
+});

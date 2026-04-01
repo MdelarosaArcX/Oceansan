@@ -4,10 +4,13 @@ export interface ISchedule extends Document {
     sched_name:string;
     src_path: string;
   dest_path: string;
+  recycle_path:string;
   type: "sync" | "archive";
+   engine: "xcopy" | "robocopy" | "rclone";
   time: string;           // HH:mm
   days: number[];         // 0-6 (Sun-Sat)
   active: boolean;
+  recycle: boolean;
   last_archived?: Date;
   last_sync?: Date;
 }
@@ -17,6 +20,7 @@ const ScheduleSchema = new Schema<ISchedule>(
     sched_name: { type: String, required: true },
     src_path: { type: String, required: true },
     dest_path: { type: String, required: true },
+    recycle_path: { type: String},
 
     type: {
       type: String,
@@ -39,8 +43,14 @@ const ScheduleSchema = new Schema<ISchedule>(
         message: "Days must be between 0 (Sun) and 6 (Sat)"
       }
     },
+    engine: {
+      type: String,
+      enum: ["robocopy", "xcopy", "rclone"],
+      required: true,
+    },
 
     active: { type: Boolean, default: true },
+    recycle: { type: Boolean, default: true },
     last_archived: { type: Date },
     last_sync: { type: Date },
   },

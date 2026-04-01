@@ -1,11 +1,7 @@
 // models/ScheduleLogs.ts
 import { Schema, model, Types } from "mongoose";
 
-export type FileStatus =
-  | "copied"
-  | "updated"
-  | "deleted"
-  | "error";
+export type FileStatus = "copied" | "updated" | "deleted" | "error";
 
 export interface ILogsFile {
   path: string;
@@ -13,6 +9,8 @@ export interface ILogsFile {
   status: FileStatus;
   error?: string;
 }
+
+export type JobStatus = "running" | "completed" | "failed" | "interrupted";
 
 export interface IScheduleLogs {
   scheduleId: Types.ObjectId;
@@ -27,6 +25,18 @@ export interface IScheduleLogs {
   totalSize: number;
 
   files: ILogsFile[];
+
+  status: JobStatus; // ✅ simple string union
+  engine: "robocopy" | "xcopy" | "rclone";
+  pid?: number;
+  attemptCount: {
+    type: Number;
+    default: 0;
+  };
+  resumedFromCrash: {
+    type: Boolean;
+    default: false;
+  };
 }
 
 const LogsFileSchema = new Schema<ILogsFile>({
@@ -34,9 +44,9 @@ const LogsFileSchema = new Schema<ILogsFile>({
   size: Number,
   status: {
     type: String,
-    enum: ["copied", "updated", "deleted", "error"]
+    enum: ["copied", "updated", "deleted", "error"],
   },
-  error: String
+  error: String,
 });
 
 const ScheduleLogsSchema = new Schema<IScheduleLogs>({
@@ -51,10 +61,23 @@ const ScheduleLogsSchema = new Schema<IScheduleLogs>({
   totalFiles: Number,
   totalSize: Number,
 
-  files: [LogsFileSchema]
+  files: [LogsFileSchema],
+
+  status: {
+    type: String,
+    enum: ["running", "completed", "failed", "interrupted"],
+    default: "running",
+  },
+  engine: String,
+  pid: Number,
+  attemptCount: {
+    type: Number,
+    default: 0,
+  },
+  resumedFromCrash: {
+    type: Boolean,
+    default: false,
+  },
 });
 
-export default model<IScheduleLogs>(
-  "ScheduleLogs",
-  ScheduleLogsSchema
-);
+export default model<IScheduleLogs>("ScheduleLogs", ScheduleLogsSchema);

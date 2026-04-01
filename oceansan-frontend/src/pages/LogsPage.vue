@@ -78,6 +78,7 @@
                     :rows="props.row.files"
                     :columns="fileColumns"
                     hide-bottom
+                    :pagination="{ rowsPerPage: 0 }"
                   >
                     <template #body-cell-size="fprops">
                       <q-td :props="fprops">
@@ -134,7 +135,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import type { QTableColumn } from 'quasar';
-import { fetchScheduleLogs } from 'src/services/scheduleLogs.service';
+import { fetchScheduleLogs, type JobLog } from 'src/services/scheduleLogs.service';
 
 /* -------------------------
  Types
@@ -158,18 +159,6 @@ interface QTableRequest {
   pagination: QTableRequestPagination;
 }
 
-interface JobLog {
-  _id: string;
-  scheduleId: string;
-  type: 'archive' | 'sync';
-  source: string;
-  destination: string;
-  startTime: string;
-  endTime: string;
-  totalFiles: number;
-  totalSize: number;
-  files: FileLog[];
-}
 
 /* -------------------------
  State
@@ -235,17 +224,28 @@ const columns: QTableColumn<JobLog>[] = [
     field: 'endTime',
     sortable: true,
     align: 'center',
-    format: (val: string) =>
-      new Intl.DateTimeFormat('en-US', {
+    format: (val?: string | null) => {
+      if (!val) return '—'; // or 'Running', 'In progress', etc.
+
+      return new Intl.DateTimeFormat('en-US', {
         month: 'short',
         day: 'numeric',
         year: 'numeric',
         hour: 'numeric',
         minute: '2-digit',
         hour12: true,
-      }).format(new Date(val)),
+      }).format(new Date(val));
+    },
   },
   { name: 'totalFiles', label: 'Files', field: 'totalFiles', align: 'center' },
+  {
+    name: 'status',
+    label: 'Status',
+    field: 'status',
+    align: 'left',
+    classes: 'ellipsis',
+    style: 'max-width: 260px',
+  },
   {
     name: 'totalSize',
     label: 'Total Size',
@@ -259,7 +259,7 @@ const columns: QTableColumn<JobLog>[] = [
  Columns (Expanded files)
 --------------------------*/
 const fileColumns: QTableColumn<FileLog>[] = [
-  { name: 'path', label: 'File Path', field: 'path', align: 'left' },
+  { name: 'path', label: 'Files', field: 'path', align: 'left' },
   { name: 'size', label: 'Size', field: 'size', align: 'right' },
   { name: 'status', label: 'Status', field: 'status' },
 ];
