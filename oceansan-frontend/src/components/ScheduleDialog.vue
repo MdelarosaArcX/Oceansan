@@ -47,7 +47,7 @@
 
                 <q-select
                   v-model="form.engine"
-                  :rules="[(val) => !!val || 'Engine is required']"
+                  :rules="[(val) => requiredRule(val) || 'Engine is required']"
                   :options="[
                     { value: 'robocopy', label: 'Robocopy' },
                     { value: 'xcopy', label: 'XCopy' },
@@ -65,7 +65,7 @@
 
                 <q-select
                   v-model="form.type"
-                  :rules="[(val) => !!val || 'Schedule Type is required']"
+                  :rules="[(val) => requiredRule(val) || 'Schedule Type is required']"
                   :options="scheduleTypeOptions"
                   option-value="value"
                   option-label="label"
@@ -82,7 +82,7 @@
                   outlined
                   dense
                   label="Schedule Name"
-                  :rules="[(val) => !!val || 'Name is required']"
+                  :rules="[(val) => requiredRule(val) || 'Name is required']"
                   required
                 />
                 <q-checkbox
@@ -98,49 +98,24 @@
               <q-card flat bordered class="q-pa-md q-gutter-md">
                 <div class="text-subtitle2">Paths</div>
 
-                <q-input
+                <FolderPicker
                   v-model="form.src_path"
-                  outlined
-                  dense
-                  icon="folder"
                   label="Source Folder"
-                  :rules="[(val) => !!val || 'Source path is required']"
-                  required
-                >
-                  <template #prepend>
-                    <q-icon name="folder" />
-                  </template>
-                </q-input>
+                  :rules="[sourcePathRule]"
+                />
 
-                <q-input
+                <FolderPicker
                   v-model="form.dest_path"
-                  outlined
-                  dense
                   label="Destination Folder"
-                  :rules="[
-                    (val) => !!val || 'Destination path is required',
-                    (val) => val !== form.src_path || 'Destination must be different from Source',
-                  ]"
-                  required
-                >
-                  <template #prepend>
-                    <q-icon name="folder" />
-                  </template>
-                </q-input>
+                  :rules="[destinationRequiredRule, destinationDiffRule]"
+                />
 
-                <q-input
+                <FolderPicker
                   v-if="form.recycle && form.type === 'sync'"
                   v-model="form.recycle_path"
-                  outlined
-                  dense
                   label="Recycle Folder"
-                  :rules="[(val) => !!val || 'Recycle path is required']"
-                  required
-                >
-                  <template #prepend>
-                    <q-icon name="folder" />
-                  </template>
-                </q-input>
+                  :rules="[recyclePathRule]"
+                />
               </q-card>
 
               <!-- Schedule -->
@@ -223,6 +198,7 @@
 </template>
 
 <script setup lang="ts">
+import FolderPicker from 'src/components/FolderPicker.vue';
 import type { SchedulePayload } from 'src/types/Schedule';
 import { computed, reactive, ref, watch } from 'vue';
 import { DAY_OPTIONS } from 'src/constants/days';
@@ -273,6 +249,14 @@ const scheduleTypeOptions = computed(() => [
     disable: form.engine === "xcopy",
   },
 ]);
+
+const requiredRule = (val: string | number | null | undefined) => !!val;
+const sourcePathRule = (val: string | null | undefined) => !!val || 'Source path is required';
+const destinationRequiredRule = (val: string | null | undefined) =>
+  !!val || 'Destination path is required';
+const destinationDiffRule = (val: string | null | undefined) =>
+  val !== form.src_path || 'Destination must be different from Source';
+const recyclePathRule = (val: string | null | undefined) => !!val || 'Recycle path is required';
 
 watch(
   () => form.engine,
@@ -328,6 +312,7 @@ async function submit() {
     close();
   }
 }
+
 const allDayValues = DAY_OPTIONS.map((d) => d.value);
 
 function reset() {

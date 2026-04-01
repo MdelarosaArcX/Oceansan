@@ -1,3 +1,5 @@
+import { contextBridge, ipcRenderer } from 'electron';
+
 /**
  * This file is used specifically for security reasons.
  * Here you can access Nodejs stuff and inject functionality into
@@ -27,3 +29,7 @@
  *   }
  * }
  */
+
+contextBridge.exposeInMainWorld('oceansan', {
+  pickFolder: () => ipcRenderer.invoke('dialog:pick-folder') as Promise<string | null>,
+});
