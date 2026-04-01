@@ -2,35 +2,57 @@
   <q-input
     outlined
     dense
-    readonly
+    :readonly="hasNativePicker"
+    :input-class="hasNativePicker ? 'cursor-pointer' : undefined"
     :label="label"
     :model-value="modelValue"
+    @update:model-value="emit('update:modelValue', $event)"
+    @click="handleClick"
   >
     <template #prepend>
       <q-icon name="folder" />
     </template>
 
-    <template #append>
+    <template v-if="hasNativePicker" #append>
       <q-btn
         flat
         dense
         icon="folder_open"
-        @click="pickFolder"
+        @click.stop="pickFolder"
       />
     </template>
   </q-input>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
+
 defineProps<{
   label: string;
-  modelValue: string;
+  modelValue: string | undefined;
 }>();
 
 const emit = defineEmits(["update:modelValue"]);
+const hasNativePicker = computed(
+  () => typeof window !== 'undefined' && typeof window.oceansan?.pickFolder === 'function',
+);
 
-function pickFolder() {
-  const path = prompt("Enter folder path");
-  if (path) emit("update:modelValue", path);
+async function pickFolder() {
+  const oceansanApi = window.oceansan;
+  if (!hasNativePicker.value || !oceansanApi) {
+    console.warn('Folder picker is unavailable because the Electron preload bridge is missing.');
+    return;
+  }
+
+  const pickedPath = await oceansanApi.pickFolder();
+  if (pickedPath) {
+    emit("update:modelValue", pickedPath);
+  }
+}
+
+function handleClick() {
+  if (hasNativePicker.value) {
+    void pickFolder();
+  }
 }
 </script>

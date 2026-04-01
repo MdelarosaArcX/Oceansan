@@ -3,11 +3,15 @@ import { startCopy, connectProgress } from 'src/services/copy.api';
 
 export const useCopyStore = defineStore('copy', {
   state: () => ({
+    backendStatus: 'offline' as 'online' | 'offline' | 'connecting',
+    osType: '',
+    osPlatform: '',
     freeGB: '',
     heapUsedMB: '',
     heapTotalMB: '',
     percent: '',
     rssMB: '',
+    connected: false,
     jobs: {} as Record<
       string,
       {
@@ -21,6 +25,9 @@ export const useCopyStore = defineStore('copy', {
 
   actions: {
     connect() {
+      if (this.connected) return;
+
+      this.connected = true;
       connectProgress(
         (jobId, p) => {
           this.jobs[jobId] = {
@@ -40,6 +47,13 @@ export const useCopyStore = defineStore('copy', {
           this.heapUsedMB = p.heapUsedMB;
           this.heapTotalMB = p.heapTotalMB;
           this.rssMB = p.rssMB;
+        },
+        (payload) => {
+          this.osType = payload.os.type;
+          this.osPlatform = payload.os.platform;
+        },
+        (status) => {
+          this.backendStatus = status;
         },
       );
     },

@@ -10,13 +10,46 @@
 
         <q-space />
 
-        <q-chip dense rounded color="info" text-color="white">
-          Heap Total: {{ store.heapTotalMB }} MB
-        </q-chip>
+        <q-btn flat round dense :color="statusButtonColor" :icon="statusButtonIcon">
+          <q-tooltip>Status</q-tooltip>
+          <q-menu anchor="bottom right" self="top right">
+            <q-list style="min-width: 260px">
+              <q-item>
+                <q-item-section avatar>
+                  <q-icon :name="backendStatusIcon" :color="backendStatusColor" />
+                </q-item-section>
+                <q-item-section>
+                  <q-item-label>Backend Service</q-item-label>
+                  <q-item-label caption>{{ backendStatusLabel }}</q-item-label>
+                </q-item-section>
+              </q-item>
 
-        <q-chip dense rounded color="info" text-color="white">
-          Available RAM: {{ store.freeGB }} GB
-        </q-chip>
+              <q-separator />
+
+              <q-item>
+                <q-item-section avatar>
+                  <q-icon name="desktop_windows" color="accent" />
+                </q-item-section>
+                <q-item-section>
+                  <q-item-label>OS Type</q-item-label>
+                  <q-item-label caption>{{ osStatus }}</q-item-label>
+                </q-item-section>
+              </q-item>
+
+              <q-separator />
+
+              <q-item>
+                <q-item-section avatar>
+                  <q-icon name="memory" color="secondary" />
+                </q-item-section>
+                <q-item-section>
+                  <q-item-label>RAM Memory</q-item-label>
+                  <q-item-label caption>{{ ramStatus }}</q-item-label>
+                </q-item-section>
+              </q-item>
+            </q-list>
+          </q-menu>
+        </q-btn>
 
         <!-- Dark mode toggle -->
         <q-btn flat round dense icon="notifications"> </q-btn>
@@ -80,7 +113,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { onMounted, ref } from 'vue';
 
 import { Dark } from 'quasar';
 import { computed } from 'vue';
@@ -96,6 +129,9 @@ function toggleDark() {
 }
 
 const store = useCopyStore();
+onMounted(() => {
+  store.connect();
+});
 
 const dialogSettings = ref<boolean>(false);
 const drawer = ref(false);
@@ -124,5 +160,52 @@ const route = useRoute();
 const activeMenu = computed(() => {
   const current = menuList.find((item) => item.to === route.path);
   return current?.label ?? '';
+});
+
+const backendStatusLabel = computed(() => {
+  if (store.backendStatus === 'online') return 'Online';
+  if (store.backendStatus === 'connecting') return 'Connecting';
+  return 'Offline';
+});
+
+const backendStatusColor = computed(() => {
+  if (store.backendStatus === 'online') return 'positive';
+  if (store.backendStatus === 'connecting') return 'warning';
+  return 'negative';
+});
+
+const backendStatusIcon = computed(() => {
+  if (store.backendStatus === 'online') return 'dns';
+  if (store.backendStatus === 'connecting') return 'sync';
+  return 'portable_wifi_off';
+});
+
+const statusButtonIcon = computed(() => {
+  if (store.backendStatus === 'online') return 'monitor_heart';
+  if (store.backendStatus === 'connecting') return 'troubleshoot';
+  return 'warning_amber';
+});
+
+const statusButtonColor = computed(() => {
+  if (store.backendStatus === 'online') return 'positive';
+  if (store.backendStatus === 'connecting') return 'warning';
+  return 'negative';
+});
+
+const ramStatus = computed(() => {
+  if (!store.rssMB && !store.freeGB) return 'Waiting...';
+  const parts = [];
+  if (store.rssMB) parts.push(`App ${store.rssMB} MB`);
+  if (store.freeGB) parts.push(`Free ${store.freeGB} GB`);
+  return parts.join(' | ');
+});
+
+const osStatus = computed(() => {
+  if (store.osType && store.osPlatform) {
+    return `${store.osType} (${store.osPlatform})`;
+  }
+
+  if (store.osType) return store.osType;
+  return 'Waiting...';
 });
 </script>
