@@ -19,4 +19,6 @@ export function createCopyEngine(
     case "rclone":
       return new RcloneService(ws);
   }
+
+  throw new Error(`Unsupported copy engine: ${engine}`);
 }

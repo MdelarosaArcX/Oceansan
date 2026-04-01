@@ -65,6 +65,14 @@ export class CopyRunnerService {
     private ws?: Broadcaster
   ) { }
 
+  private broadcast(data: unknown) {
+    try {
+      this.ws?.(data);
+    } catch (error) {
+      console.error("CopyRunner broadcast failed:", error);
+    }
+  }
+
   async run({
     scheduleId,
     type,
@@ -85,6 +93,10 @@ export class CopyRunnerService {
     existingLogId?: number;
   }) {
     const copier = createCopyEngine(engine, this.ws);
+    if (!fs.existsSync(source)) {
+      throw new Error(`Source path does not exist: ${source}`);
+    }
+    fs.ensureDirSync(destination);
 
     const sourceFiles = walkDir(source);
     let totalBytes = 0;
@@ -216,7 +228,7 @@ export class CopyRunnerService {
       await this.scheduleLogsRepo.save(logDoc);
     };
 
-    this.ws?.({
+    this.broadcast({
       type: "start",
       totalFiles,
       totalBytes,
@@ -231,51 +243,55 @@ export class CopyRunnerService {
 
     // --- Monitor progress ---
     const monitorInterval = setInterval(() => {
-      let deltaBytes = 0;
-      let currentFile: string | null = null;
-      const destFiles = walkDir(destination);
+      try {
+        let deltaBytes = 0;
+        let currentFile: string | null = null;
+        const destFiles = walkDir(destination);
 
-      for (const f of destFiles) {
-        const prev = destSnapshot.get(f.path) || 0;
-        const change = f.size - prev;
-        if (change > 0) {
-          deltaBytes += change;
-          destSnapshot.set(f.path, f.size);
-          if (!currentFile || change > (destSnapshot.get(currentFile) || 0)) {
-            currentFile = f.path;
+        for (const f of destFiles) {
+          const prev = destSnapshot.get(f.path) || 0;
+          const change = f.size - prev;
+          if (change > 0) {
+            deltaBytes += change;
+            destSnapshot.set(f.path, f.size);
+            if (!currentFile || change > (destSnapshot.get(currentFile) || 0)) {
+              currentFile = f.path;
+            }
           }
         }
+
+        copiedBytes += deltaBytes;
+
+        const percent = totalBytes
+          ? Math.min(100, (copiedBytes / totalBytes) * 100)
+          : 0;
+
+        const now = Date.now();
+        const deltaTime = (now - lastTime) / 1000 || 1;
+        const smoothSpeed = ema.update(deltaBytes / deltaTime);
+        lastTime = now;
+
+        const speedStr =
+          smoothSpeed >= 1024 ** 3
+            ? { value: smoothSpeed / 1024 ** 3, unit: "GB/s" }
+            : smoothSpeed >= 1024 ** 2
+              ? { value: smoothSpeed / 1024 ** 2, unit: "MB/s" }
+              : smoothSpeed >= 1024
+                ? { value: smoothSpeed / 1024, unit: "KB/s" }
+                : { value: smoothSpeed, unit: "B/s" };
+
+        this.broadcast({
+          type: "progress",
+          currentFile: currentFile ? path.basename(currentFile) : null,
+          speed: speedStr.value.toFixed(2) + " " + speedStr.unit,
+          percent: engine === "rclone" ? percent : 0,
+          copiedBytes,
+          totalBytes,
+          scheduleId,
+        });
+      } catch (error) {
+        console.error(`CopyRunner monitor failed for schedule ${scheduleId}:`, error);
       }
-
-      copiedBytes += deltaBytes;
-
-      const percent = totalBytes
-        ? Math.min(100, (copiedBytes / totalBytes) * 100)
-        : 0;
-
-      const now = Date.now();
-      const deltaTime = (now - lastTime) / 1000 || 1;
-      const smoothSpeed = ema.update(deltaBytes / deltaTime);
-      lastTime = now;
-
-      const speedStr =
-        smoothSpeed >= 1024 ** 3
-          ? { value: smoothSpeed / 1024 ** 3, unit: "GB/s" }
-          : smoothSpeed >= 1024 ** 2
-            ? { value: smoothSpeed / 1024 ** 2, unit: "MB/s" }
-            : smoothSpeed >= 1024
-              ? { value: smoothSpeed / 1024, unit: "KB/s" }
-              : { value: smoothSpeed, unit: "B/s" };
-
-      this.ws?.({
-        type: "progress",
-        currentFile: currentFile ? path.basename(currentFile) : null,
-        speed: speedStr.value.toFixed(2) + " " + speedStr.unit,
-        percent: engine === "rclone" ? percent : 0,
-        copiedBytes,
-        totalBytes,
-        scheduleId,
-      });
     }, 500);
 
     // --- Wait for copy to finish ---
@@ -300,7 +316,7 @@ export class CopyRunnerService {
       const durationSeconds = Math.floor((Date.now() - startedAt) / 1000);
       const avgSpeed = durationSeconds > 0 ? totalBytes / durationSeconds : 0;
 
-      this.ws?.({
+      this.broadcast({
         type: "complete",
         totalFiles,
         totalBytes,
@@ -310,12 +326,17 @@ export class CopyRunnerService {
       });
     } catch (err: any) {
       clearInterval(monitorInterval);
-      logDoc.status = "interrupted";
-      await this.scheduleLogsRepo.save(logDoc);
-      this.ws?.({
+      try {
+        logDoc.status = "interrupted";
+        await this.scheduleLogsRepo.save(logDoc);
+      } catch (saveError) {
+        console.error(`Failed to persist interrupted status for schedule ${scheduleId}:`, saveError);
+      }
+      this.broadcast({
         type: "error",
-        message: err.message,
+        message: err?.message ?? "Unknown copy runner error",
       });
+      throw err;
     }
   }
 }

@@ -36,7 +36,7 @@ export default class XcopyService extends CopyEngine {
       "/Q",
     ];
 
-    console.log("[xcopy] CMD:", "cmd", args.join(" "));
+    // console.log("[xcopy] CMD:", "cmd", args.join(" "));
 
     this.emit("start", {});
     await this.run(args);
@@ -55,17 +55,17 @@ export default class XcopyService extends CopyEngine {
       });
 
       proc.stdout.on("data", (d) => {
-        console.log("[xcopy][stdout]", d.toString());
+        // console.log("[xcopy][stdout]", d.toString());
         this.emit("log", d.toString());
       });
 
       proc.stderr.on("data", (d) => {
-        console.log("[xcopy][stderr]", d.toString());
+        // console.log("[xcopy][stderr]", d.toString());
         this.emit("log", d.toString());
       });
 
       proc.on("close", (code) => {
-        console.log("[xcopy] exit code:", code);
+        // console.log("[xcopy] exit code:", code);
 
         // XCOPY success: 0 or 1
         if (code === 0 || code === 1) {

@@ -1,9 +1,15 @@
 const path = require('path');
-const { app, BrowserWindow, protocol, dialog } = require('electron');
+const { app, BrowserWindow, protocol, dialog, ipcMain, Tray, Menu } = require('electron');
 const fs = require('fs');
 const { spawn } = require('child_process');
 const http = require('http');
 const https = require('https');
+
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+
+if (!gotSingleInstanceLock) {
+  app.quit();
+}
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -53,6 +59,22 @@ function getFrontendDir() {
 
 let backendProcess = null;
 let frontendProcess = null;
+let mainWindow = null;
+let tray = null;
+let isQuitting = false;
+
+ipcMain.handle('dialog:pick-folder', async (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  const result = await dialog.showOpenDialog(win || undefined, {
+    properties: ['openDirectory'],
+  });
+
+  if (result.canceled || result.filePaths.length === 0) {
+    return null;
+  }
+
+  return result.filePaths[0];
+});
 
 function isUrlReachable(targetUrl, timeoutMs = 2000) {
   return new Promise((resolve) => {
@@ -189,6 +211,16 @@ async function createWindow() {
     win.show();
   });
 
+  win.on('close', (event) => {
+    if (isQuitting) return;
+    if (!tray) return;
+
+    event.preventDefault();
+    win.hide();
+  });
+
+  mainWindow = win;
+
   if (app.isPackaged) {
     await win.loadURL('app://index.html');
     return;
@@ -206,7 +238,63 @@ async function createWindow() {
   await win.loadURL(devUrl);
 }
 
+function getTrayIconPath() {
+  const candidates = [
+    path.join(__dirname, 'logo.ico'),
+    path.join(__dirname, 'oceansan-frontend', 'src-electron', 'icons', 'icon.ico'),
+    path.join(__dirname, 'oceansan-frontend', 'src-electron', 'icons', 'icon.png'),
+  ];
+
+  return candidates.find((candidate) => fs.existsSync(candidate));
+}
+
+function showMainWindow() {
+  if (!mainWindow) return;
+
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore();
+  }
+
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+function createTray() {
+  if (tray) return;
+
+  const trayIconPath = getTrayIconPath();
+  if (!trayIconPath) {
+    console.warn('Tray icon not found. Skipping tray setup.');
+    return;
+  }
+
+  tray = new Tray(trayIconPath);
+  tray.setToolTip('OceanSAN');
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      {
+        label: 'Show OceanSAN',
+        click: () => showMainWindow(),
+      },
+      {
+        label: 'Exit',
+        click: () => {
+          isQuitting = true;
+          tray?.destroy();
+          app.quit();
+        },
+      },
+    ]),
+  );
+  tray.on('double-click', () => showMainWindow());
+}
+
+app.on('second-instance', () => {
+  showMainWindow();
+});
+
 app.on('before-quit', () => {
+  isQuitting = true;
   killProcessTree(frontendProcess);
   killProcessTree(backendProcess);
 });
@@ -244,11 +332,14 @@ app.whenReady().then(async () => {
 
   startBackend();
   startFrontendDevServer();
+  createTray();
   await createWindow();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
+    } else {
+      showMainWindow();
     }
   });
 });
