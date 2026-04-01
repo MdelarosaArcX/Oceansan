@@ -33,9 +33,11 @@
           v-model="key"
           dense
           outlined
+          input-class="text-white"
           placeholder="Enter license key"
           class="q-mb-sm"
           :disable="submitting"
+          @keyup.enter="handleSubmit"
         />
 
         <q-btn

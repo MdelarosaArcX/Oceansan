@@ -81,7 +81,7 @@
               </div>
             </q-linear-progress>
             <div class="text-caption text-grey q-mt-xs ellipsis" v-if="props.row.engine !== 'rclone'">
-              {{ store.jobs[props.row.id]?.speed }}
+              est. {{ store.jobs[props.row.id]?.speed }}
             </div>
           </div>
         </q-td>
