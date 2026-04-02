@@ -2,6 +2,8 @@ import "reflect-metadata";
 import { DataSource } from "typeorm";
 import path from "path";
 import dotenv from "dotenv";
+import { BackupRun } from "../entities/BackupRun";
+import { BackupSettings } from "../entities/BackupSettings";
 import { Directories } from "../entities/Directories";
 import { FileMetadata } from "../entities/FileMetadata";
 import { Schedule } from "../entities/Schedule";
@@ -23,6 +25,8 @@ export const AppDataSource = new DataSource({
   logging: false,
 
   entities: [
+    BackupRun,
+    BackupSettings,
     Directories,
     FileMetadata,
     Schedule,

@@ -27,3 +27,9 @@
  *   }
  * }
  */
+import { contextBridge, ipcRenderer, shell } from 'electron';
+
+contextBridge.exposeInMainWorld('oceansan', {
+  openDirectory: () => ipcRenderer.invoke('dialog:openDirectory') as Promise<string | null>,
+  openExternal: (url: string) => shell.openExternal(url),
+});
