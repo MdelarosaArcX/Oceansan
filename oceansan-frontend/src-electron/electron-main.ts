@@ -4,6 +4,7 @@ import path from 'path';
 import os from 'os';
 import { fileURLToPath } from 'url'
 
+//
 // needed in case process is undefined under Linux
 const platform = process.platform || os.platform();
 
@@ -65,6 +66,14 @@ async function createWindow() {
     mainWindow = undefined;
   });
 }
+
+ipcMain.handle('dialog:openDirectory', async () => {
+  const result = await dialog.showOpenDialog({
+    properties: ['openDirectory'],
+  });
+  if (result.canceled) return null;
+  return result.filePaths[0] ?? null;
+});
 
 void app.whenReady().then(createWindow);
 

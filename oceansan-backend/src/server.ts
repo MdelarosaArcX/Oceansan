@@ -9,6 +9,7 @@ import { WebSocketServer } from "ws";
 import scheduleRoutes from "./routes/schedule.routes";
 import scheduleLogsRoutes from "./routes/scheduleLogs.routes";
 import licenseRoutes from "./routes/license.routes";
+import backupRoutes from "./routes/backup.routes";
 import schedulerService from "./services/scheduler.service";
 // import Schedule from "./models/Schedule";
 import { CopyRunnerService } from "./services/copy-runner.service";
@@ -253,5 +254,6 @@ process.on("unhandledRejection", (reason) => {
 app.use("/api/schedules", scheduleRoutes);
 app.use("/api/schedulesLogs", scheduleLogsRoutes);
 app.use("/license", licenseRoutes);
+app.use("/api/backup", backupRoutes);
 
 /* ---------------- Start Server ---------------- */
