@@ -15,6 +15,7 @@ import { ScheduleLogs } from "../entities/ScheduleLogs";
 import { ScheduleLogFile } from "../entities/ScheduleLogFile";
 import { AppDataSource } from "../config/typeorm.config";
 import { Schedule } from "../entities/Schedule";
+import { CopyEngine } from "./copy.engine";
 
 type Broadcaster = (data: unknown) => void;
 type PendingFile = {
@@ -60,6 +61,14 @@ function findLargestGrowingFile(
   return currentFile;
 }
 export class CopyRunnerService {
+  private static activeJobs = new Map<number, CopyRunnerService>();
+  private copier: CopyEngine | null = null;
+  private scheduleId: number | null = null;
+  private paused = false;
+  private sourcePath: string | null = null;
+  private destinationPath: string | null = null;
+  private verifyAfterResume = false;
+
   constructor(
     private scheduleLogsRepo: Repository<ScheduleLogs>,
     private ws?: Broadcaster
@@ -71,6 +80,97 @@ export class CopyRunnerService {
     } catch (error) {
       console.error("CopyRunner broadcast failed:", error);
     }
+  }
+
+  static hasActiveJob(scheduleId: number) {
+    return this.activeJobs.has(scheduleId);
+  }
+
+  static async pause(scheduleId: number) {
+    const runner = this.activeJobs.get(scheduleId);
+    if (!runner) {
+      throw new Error("No active job found for this schedule.");
+    }
+    await runner.pause();
+  }
+
+  static async resume(scheduleId: number) {
+    const runner = this.activeJobs.get(scheduleId);
+    if (!runner) {
+      throw new Error("No active job found for this schedule.");
+    }
+    await runner.resume();
+  }
+
+  static async stop(scheduleId: number) {
+    const runner = this.activeJobs.get(scheduleId);
+    if (!runner) {
+      throw new Error("No active job found for this schedule.");
+    }
+    await runner.stop();
+  }
+
+  private async pause() {
+    if (!this.copier) {
+      throw new Error("Job is not running.");
+    }
+
+    this.paused = true;
+    this.broadcast({
+      type: "job-state",
+      scheduleId: this.scheduleId,
+      state: "paused",
+    });
+    try {
+      await this.copier.pause();
+    } catch (error) {
+      this.paused = false;
+      this.broadcast({
+        type: "job-state",
+        scheduleId: this.scheduleId,
+        state: "running",
+      });
+      throw error;
+    }
+  }
+
+  private async resume() {
+    if (!this.copier) {
+      throw new Error("Job is not running.");
+    }
+
+    this.paused = false;
+    this.verifyAfterResume = true;
+    this.broadcast({
+      type: "job-state",
+      scheduleId: this.scheduleId,
+      state: "running",
+    });
+    try {
+      await this.copier.resume();
+    } catch (error) {
+      this.paused = true;
+      this.broadcast({
+        type: "job-state",
+        scheduleId: this.scheduleId,
+        state: "paused",
+      });
+      throw error;
+    }
+  }
+
+  private async stop() {
+    if (!this.copier) {
+      throw new Error("Job is not running.");
+    }
+
+    await this.copier.stop();
+    this.paused = false;
+    this.broadcast({
+      type: "job-state",
+      scheduleId: this.scheduleId,
+      state: "stopped",
+    });
   }
 
   async run({
@@ -93,10 +193,19 @@ export class CopyRunnerService {
     existingLogId?: number;
   }) {
     const copier = createCopyEngine(engine, this.ws);
+
     if (!fs.existsSync(source)) {
       throw new Error(`Source path does not exist: ${source}`);
     }
     fs.ensureDirSync(destination);
+
+    this.copier = copier;
+    this.scheduleId = scheduleId;
+    this.paused = false;
+    this.sourcePath = source;
+    this.destinationPath = destination;
+    this.verifyAfterResume = false;
+    CopyRunnerService.activeJobs.set(scheduleId, this);
 
     const sourceFiles = walkDir(source);
     let totalBytes = 0;
@@ -233,6 +342,7 @@ export class CopyRunnerService {
       totalFiles,
       totalBytes,
       startedAt,
+      scheduleId,
     });
 
     // --- Start copy/sync ---
@@ -247,6 +357,9 @@ export class CopyRunnerService {
         let deltaBytes = 0;
         let currentFile: string | null = null;
         const destFiles = walkDir(destination);
+        if (this.paused) {
+          return;
+        }
 
         for (const f of destFiles) {
           const prev = destSnapshot.get(f.path) || 0;
@@ -297,7 +410,14 @@ export class CopyRunnerService {
     // --- Wait for copy to finish ---
     try {
       await runPromise;
+      const repairedSummary = await this.repairIncompleteFilesAfterResume();
       clearInterval(monitorInterval);
+      CopyRunnerService.activeJobs.delete(scheduleId);
+      this.copier = null;
+      this.scheduleId = null;
+      this.sourcePath = null;
+      this.destinationPath = null;
+      this.verifyAfterResume = false;
       await flushLogs();
 
       logDoc.endTime = new Date();
@@ -323,9 +443,17 @@ export class CopyRunnerService {
         scheduleId,
         averageSpeedBps: Math.floor(avgSpeed),
         durationSeconds,
+        repairedFiles: repairedSummary.repairedFiles,
+        repairedBytes: repairedSummary.repairedBytes,
       });
     } catch (err: any) {
       clearInterval(monitorInterval);
+      CopyRunnerService.activeJobs.delete(scheduleId);
+      this.copier = null;
+      this.scheduleId = null;
+      this.sourcePath = null;
+      this.destinationPath = null;
+      this.verifyAfterResume = false;
       try {
         logDoc.status = "interrupted";
         await this.scheduleLogsRepo.save(logDoc);
@@ -338,5 +466,56 @@ export class CopyRunnerService {
       });
       throw err;
     }
+  }
+
+  private async repairIncompleteFilesAfterResume(): Promise<{
+    repairedFiles: number;
+    repairedBytes: number;
+  }> {
+    if (!this.verifyAfterResume || !this.sourcePath || !this.destinationPath) {
+      return { repairedFiles: 0, repairedBytes: 0 };
+    }
+
+    const source = this.sourcePath;
+    const destination = this.destinationPath;
+
+    let repairedFiles = 0;
+    let repairedBytes = 0;
+
+    const sourceFiles = walkDir(source);
+    for (const srcFile of sourceFiles) {
+      const relativePath = path.relative(source, srcFile.path);
+      const destPath = path.join(destination, relativePath);
+
+      let shouldRecopy = false;
+      try {
+        const stat = fs.statSync(destPath);
+        if (stat.size !== srcFile.size) {
+          shouldRecopy = true;
+        }
+      } catch {
+        shouldRecopy = true;
+      }
+
+      if (!shouldRecopy) {
+        continue;
+      }
+
+      fs.ensureDirSync(path.dirname(destPath));
+      await fs.copy(srcFile.path, destPath, { overwrite: true });
+      repairedFiles += 1;
+      repairedBytes += srcFile.size;
+    }
+
+    if (repairedFiles > 0) {
+      this.broadcast({
+        type: "verify-repair",
+        scheduleId: this.scheduleId,
+        repairedFiles,
+        repairedBytes,
+      });
+    }
+
+    return { repairedFiles, repairedBytes };
   }
 }

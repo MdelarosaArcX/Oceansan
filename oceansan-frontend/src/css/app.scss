@@ -1,6 +1,47 @@
 // app global css in SCSS form
+@font-face {
+  font-family: "OceanSansHelvetica";
+  src: url("src/assets/font/HelveticaNeueLight.otf") format("opentype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "OceanSansHelvetica";
+  src: url("src/assets/font/HelveticaNeueMedium.otf") format("opentype");
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "OceanSansHelvetica";
+  src: url("src/assets/font/HelveticaNeueBold.otf") format("opentype");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
 :root {
   --page-bg: #f8fafc;
+}
+
+.fw-light { font-weight: 300 !important; }  // can map to nearest available if not loaded
+.fw-medium { font-weight: 500 !important; }
+.fw-bold { font-weight: 700 !important; }
+
+
+body {
+  font-family: "OceanSansHelvetica", "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+#q-app,
+.q-layout,
+.q-page,
+.q-field,
+.q-btn {
+  font-family: "OceanSansHelvetica", "Helvetica Neue", Helvetica, Arial, sans-serif;
 }
 
 .bg-base-light-1 {
@@ -15,6 +56,10 @@
   background-color: $base-light-3;
 }
 
+.bg-base-light-4 {
+  background-color: $base-light-4;
+}
+
 .text-base-light-1 {
   color: $base-light-1;
 }
@@ -25,6 +70,10 @@
 
 .text-base-light-3 {
   color: $base-light-3;
+}
+
+.text-base-light-4 {
+  color: $base-light-4;
 }
 
 // dark
@@ -40,12 +89,24 @@
   background-color: $base-dark-3;
 }
 
+.bg-base-dark-4 {
+  background-color: $base-dark-4;
+}
+
+.bg-base-dark-5 {
+  background-color: $base-dark-5;
+}
+
+.bg-base-dark-6 {
+  background-color: $base-dark-6;
+}
+
 .text-base-dark-1 {
   color: $base-dark-1;
 }
 
 .text-base-dark-2 {
-  color: $base-dark-2;
+  color: $base-dark-2 !important;
 }
 
 .text-base-dark-3 {

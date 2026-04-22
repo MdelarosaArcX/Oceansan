@@ -1,10 +1,13 @@
 // rsync.service.ts
-import { spawn } from "child_process";
+import { ChildProcessWithoutNullStreams, spawn } from "child_process";
 import os from "os";
 import { CopyEngine, CopyOptions } from "./copy.engine";
+import { killProcessTree, resumeProcess, suspendProcess } from "../utils/process-control";
 
 type Broadcaster = (data: unknown) => void;
 export default class RsyncService extends CopyEngine {
+  private proc: ChildProcessWithoutNullStreams | null = null;
+
   constructor(private ws?: Broadcaster) {
     super();
     console.log("WS injected:", !!ws);
@@ -49,13 +52,15 @@ export default class RsyncService extends CopyEngine {
 
   private run(mode: string, args: string[]): Promise<void> {
     return new Promise((resolve, reject) => {
-      const proc = spawn("rsync", args);
+      this.proc = spawn("rsync", args);
+      const proc = this.proc;
 
       proc.stdout.on("data", (d) => {
         this.emit("log", d.toString());
       });
 
       proc.on("close", (code) => {
+        this.proc = null;
         if (code === 0) {
           this.emit("complete", {});
           resolve();
@@ -64,5 +69,26 @@ export default class RsyncService extends CopyEngine {
         }
       });
     });
+  }
+
+  async pause(): Promise<void> {
+    if (!this.proc?.pid) {
+      throw new Error("Rsync job is not running.");
+    }
+    await suspendProcess(this.proc.pid);
+  }
+
+  async resume(): Promise<void> {
+    if (!this.proc?.pid) {
+      throw new Error("Rsync job is not running.");
+    }
+    await resumeProcess(this.proc.pid);
+  }
+
+  async stop(): Promise<void> {
+    if (!this.proc?.pid) {
+      throw new Error("Rsync job is not running.");
+    }
+    await killProcessTree(this.proc.pid);
   }
 }

@@ -1,12 +1,15 @@
-import { spawn } from "child_process";
+import { ChildProcessWithoutNullStreams, spawn } from "child_process";
 import { CopyEngine, CopyOptions } from "./copy.engine";
 import path from "path";
+import { killProcessTree, resumeProcess, suspendProcess } from "../utils/process-control";
 
 const rclonePath = path.join(process.cwd(), "rclone", "rclone.exe");
 
 type Broadcaster = (data: unknown) => void;
 
 export default class RcloneService extends CopyEngine {
+  private proc: ChildProcessWithoutNullStreams | null = null;
+
   constructor(private ws?: Broadcaster) {
     super();
   }
@@ -57,7 +60,8 @@ export default class RcloneService extends CopyEngine {
         args.push(`--backup-dir=${backupDir}`);
       }
       args.push("--transfers=8", "--checkers=16", "--fast-list");
-      const proc = spawn(rclonePath, args, { shell: false });
+      this.proc = spawn(rclonePath, args, { shell: false });
+      const proc = this.proc;
       // const proc = spawn("rclone", args, { shell: false });
 
       proc.stdout.on("data", (data: Buffer) => {
@@ -109,6 +113,7 @@ export default class RcloneService extends CopyEngine {
       // });
 
       proc.on("close", (code) => {
+        this.proc = null;
         if (code === 0) {
           this.emit("complete", { engine: "rclone" });
           resolve();
@@ -118,5 +123,26 @@ export default class RcloneService extends CopyEngine {
         reject(new Error(`rclone failed (${code}): ${lastError}`));
       });
     });
+  }
+
+  async pause(): Promise<void> {
+    if (!this.proc?.pid) {
+      throw new Error("Rclone job is not running.");
+    }
+    await suspendProcess(this.proc.pid);
+  }
+
+  async resume(): Promise<void> {
+    if (!this.proc?.pid) {
+      throw new Error("Rclone job is not running.");
+    }
+    await resumeProcess(this.proc.pid);
+  }
+
+  async stop(): Promise<void> {
+    if (!this.proc?.pid) {
+      throw new Error("Rclone job is not running.");
+    }
+    await killProcessTree(this.proc.pid);
   }
 }

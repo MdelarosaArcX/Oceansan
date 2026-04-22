@@ -11,4 +11,7 @@ export interface CopyOptions {
 export abstract class CopyEngine extends EventEmitter {
   abstract archive(src: string, dest: string): Promise<void>;
   abstract sync(src: string, dest: string, opts?: CopyOptions): Promise<void>;
+  abstract pause(): Promise<void>;
+  abstract resume(): Promise<void>;
+  abstract stop(): Promise<void>;
 }

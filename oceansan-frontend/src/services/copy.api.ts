@@ -16,10 +16,21 @@ type ProgressPayload = {
 };
 
 type RamPayload = {
-  freeGB: string;
-  heapUsedMB: string;
-  heapTotalMB: string;
-  rssMB: string;
+  process: {
+    heapUsedMB: number;
+    heapTotalMB: number;
+    rssMB: number;
+  };
+  system: {
+    freeGB: number;
+    ramUsagePercent: number;
+    cpuUsagePercent: number;
+    network: {
+      rxMbps: number;
+      txMbps: number;
+      totalMbps: number;
+    };
+  };
 };
 
 type SystemInfoPayload = {
@@ -38,10 +49,23 @@ export function startCopy(from: string, to: string, engine: string, type: string
   return axios.post(`${API_URL}/copy/start`, { from, to, engine, type, jobId,name,recycle:recycle,recycle_path:recycle_path });
 }
 
+export function pauseCopy(jobId: string) {
+  return axios.post(`${API_URL}/copy/pause`, { jobId });
+}
+
+export function resumeCopy(jobId: string) {
+  return axios.post(`${API_URL}/copy/resume`, { jobId });
+}
+
+export function stopCopy(jobId: string) {
+  return axios.post(`${API_URL}/copy/stop`, { jobId });
+}
+
 export function connectProgress(
   onProgress: (jobId: string, p: ProgressPayload) => void,
   onComplete: (jobId: string) => void,
-  onRamUsage: (p: RamPayload, gb: string) => void,
+  onJobState: (jobId: string, state: 'running' | 'paused' | 'stopped') => void,
+  onRamUsage: (payload: RamPayload) => void,
   onSystemInfo: (payload: SystemInfoPayload) => void,
   onBackendStatus: (status: 'online' | 'offline' | 'connecting') => void,
 ) {
@@ -67,8 +91,12 @@ export function connectProgress(
       onComplete(data.scheduleId);
     }
 
+    if (data.type === 'job-state') {
+      onJobState(data.scheduleId, data.state);
+    }
+
     if (data.type === 'RAM_USAGE') {
-      onRamUsage(data.payload.process, data.payload.system.freeGB);
+      onRamUsage(data.payload);
     }
 
     if (data.type === 'SYSTEM_INFO') {
@@ -87,7 +115,7 @@ export function connectProgress(
     if (!manualClose && !reconnectTimer) {
       reconnectTimer = setTimeout(() => {
         reconnectTimer = null;
-        connectProgress(onProgress, onComplete, onRamUsage, onSystemInfo, onBackendStatus);
+        connectProgress(onProgress, onComplete, onJobState, onRamUsage, onSystemInfo, onBackendStatus);
       }, 3000);
     }
   };

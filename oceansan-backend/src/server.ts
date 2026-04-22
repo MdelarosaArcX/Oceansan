@@ -161,12 +161,17 @@ try {
 /* ---------------- REST APIs ---------------- */
 app.post("/copy/start", async (req, res) => {
   const { from, to, type, jobId, name, recycle, recycle_path, engine } = req.body;
+  const scheduleId = Number(jobId);
 
-  if (!from || !to) {
+  if (!from || !to || !Number.isFinite(scheduleId)) {
     return res.status(400).json({ error: "Missing from/to paths" });
   }
 
   try {
+    if (CopyRunnerService.hasActiveJob(scheduleId)) {
+      return res.status(409).json({ error: "Job already running." });
+    }
+
     const scheduleLogsRepo = AppDataSource.getRepository(ScheduleLogs);
     const runner = new CopyRunnerService(
       scheduleLogsRepo,
@@ -176,7 +181,7 @@ app.post("/copy/start", async (req, res) => {
 
     // Update resumedFromCrash using TypeORM
     await scheduleLogsRepo.update(
-      { id: jobId },
+      { id: scheduleId },
       { resumedFromCrash: true } as any
     );
 
@@ -187,20 +192,66 @@ app.post("/copy/start", async (req, res) => {
     // await scheduleLogsRepo.save(log);
 
     // Run the copy job
-    await runner.run({
-      scheduleId: jobId, // or new Types.ObjectId(jobId) if id is still string
+    void runner.run({
+      scheduleId,
       type,
       name,
       source: from,
       destination: to,
       option: { recycle, recycle_path },
       engine,
+    }).catch((error) => {
+      console.error(`Manual copy failed for schedule ${scheduleId}:`, error);
     });
 
-
-    res.json({ status: "started" });
+    res.status(202).json({ status: "started" });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/copy/pause", async (req, res) => {
+  const scheduleId = Number(req.body?.jobId ?? req.body?.scheduleId);
+
+  if (!Number.isFinite(scheduleId)) {
+    return res.status(400).json({ error: "Missing or invalid jobId." });
+  }
+
+  try {
+    await CopyRunnerService.pause(scheduleId);
+    return res.json({ status: "paused" });
+  } catch (err: any) {
+    return res.status(404).json({ error: err.message ?? "Failed to pause job." });
+  }
+});
+
+app.post("/copy/resume", async (req, res) => {
+  const scheduleId = Number(req.body?.jobId ?? req.body?.scheduleId);
+
+  if (!Number.isFinite(scheduleId)) {
+    return res.status(400).json({ error: "Missing or invalid jobId." });
+  }
+
+  try {
+    await CopyRunnerService.resume(scheduleId);
+    return res.json({ status: "resumed" });
+  } catch (err: any) {
+    return res.status(404).json({ error: err.message ?? "Failed to resume job." });
+  }
+});
+
+app.post("/copy/stop", async (req, res) => {
+  const scheduleId = Number(req.body?.jobId ?? req.body?.scheduleId);
+
+  if (!Number.isFinite(scheduleId)) {
+    return res.status(400).json({ error: "Missing or invalid jobId." });
+  }
+
+  try {
+    await CopyRunnerService.stop(scheduleId);
+    return res.json({ status: "stopped" });
+  } catch (err: any) {
+    return res.status(404).json({ error: err.message ?? "Failed to stop job." });
   }
 });
 

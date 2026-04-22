@@ -1,39 +1,33 @@
 <template>
   <q-card class="dashboard-card modern-card">
-    <q-card-section class="row items-center justify-between q-pb-sm">
-      <div class="row items-center q-gutter-sm">
-        <q-icon name="list_alt" color="primary" size="20px" />
-        <div class="text-subtitle1 text-weight-medium">Schedules</div>
-      </div>
-
-      <q-btn
-        unelevated
-        :class="
-          $q.dark.isActive ? 'bg-accent  text-base-dark-3' : 'bg-base-dark-2 text-base-light-1'
-        "
-        icon="add_circle"
-        rounded
-        label="Create Schedule"
-        @click="openCreate"
-        no-caps
-      />
-    </q-card-section>
-
-    <q-separator />
-
     <q-table
       flat
       class="modern-table"
-      :rows="rows"
+      :card-class="$q.dark.isActive ? 'bg-base-dark-4' : 'bg-base-light-2'"
+      :rows="props.rows"
       :columns="columns"
       row-key="id"
       separator="horizontal"
+      :table-row-class-fn="() => $q.dark.isActive ? 'bg-base-dark-6' : 'bg-base-light-4'"
       :rows-per-page-options="[5, 10, 20]"
     >
+      <template v-slot:header="props">
+        <q-tr :props="props" >
+          <q-th
+            v-for="col in props.cols"
+            :key="col.name"
+            :props="props"
+            class="text-uppercase"
+            :class="'text-uppercase fw-light' + $q.dark.isActive ? 'bg-base-dark-4' : 'text-base-dark-2'"
+          >
+            {{ col.label }}
+          </q-th>
+        </q-tr>
+      </template>
       <template #body-cell-from="props">
         <q-td :props="props">
           <div class="path-cell">
-            <q-icon name="folder" size="16px" class="q-mr-xs text-grey-6" />
+            <q-icon name="drive_folder_upload" size="16px" class="q-mr-xs text-grey-6" />
             <span class="path-text">
               {{ shortenPath(props.value) }}
               <q-tooltip>{{ props.value }}</q-tooltip>
@@ -45,7 +39,7 @@
       <template #body-cell-to="props">
         <q-td :props="props">
           <div class="path-cell">
-            <q-icon name="folder_open" size="16px" class="q-mr-xs text-grey-6" />
+            <q-icon name="o_archive" size="16px" class="q-mr-xs text-grey-6" />
             <span class="path-text">
               {{ shortenPath(props.value) }}
               <q-tooltip>{{ props.value }}</q-tooltip>
@@ -67,7 +61,14 @@
           </div>
 
           <div v-else class="progress-cell">
-            <q-chip dense rounded color="red" text-color="white"> Running </q-chip>
+            <q-chip
+              dense
+              rounded
+              :color="store.jobs[props.row.id]?.status === 'paused' ? 'warning' : 'red'"
+              text-color="white"
+            >
+              {{ store.jobs[props.row.id]?.status === 'paused' ? 'Paused' : 'Running' }}
+            </q-chip>
             <q-linear-progress
               stripe
               rounded
@@ -77,10 +78,17 @@
               color="primary"
               class="q-mt-sm"
               ><div class="absolute-full flex flex-center">
-                <q-badge text-color="white" color="primary" :label="store.jobs[props.row.id]?.speed" />
+                <q-badge
+                  text-color="white"
+                  color="primary"
+                  :label="store.jobs[props.row.id]?.speed"
+                />
               </div>
             </q-linear-progress>
-            <div class="text-caption text-grey q-mt-xs ellipsis" v-if="props.row.engine !== 'rclone'">
+            <div
+              class="text-caption text-grey q-mt-xs ellipsis"
+              v-if="props.row.engine !== 'rclone'"
+            >
               est. {{ store.jobs[props.row.id]?.speed }}
             </div>
           </div>
@@ -92,7 +100,7 @@
         <q-td :props="props">
           <div class="action-cell">
             <q-btn
-              :disable="store.jobs[props.row.id]?.status === 'running'"
+              v-if="!isRowRunning(props.row.id) && !isRowPaused(props.row.id)"
               dense
               flat
               round
@@ -104,17 +112,64 @@
             </q-btn>
 
             <q-btn
+              v-if="isRowRunning(props.row.id)"
+              dense
+              flat
+              round
+              icon="pause"
+              color="warning"
+              @click="emit('pause', props.row)"
+            >
+              <q-tooltip>Pause</q-tooltip>
+            </q-btn>
+
+            <q-btn
+              v-if="isRowPaused(props.row.id)"
+              dense
+              flat
+              round
+              icon="play_arrow"
+              color="positive"
+              @click="emit('resume', props.row)"
+            >
+              <q-tooltip>Resume</q-tooltip>
+            </q-btn>
+
+            <q-btn
+              v-if="
+                isRowRunning(props.row.id) ||
+                isRowPaused(props.row.id)
+              "
+              dense
+              flat
+              round
+              icon="stop_circle"
+              color="negative"
+              @click="emit('stop', props.row)"
+            >
+              <q-tooltip>Stop</q-tooltip>
+            </q-btn>
+
+            <q-btn
+              v-if="!isRowRunning(props.row.id) && !isRowPaused(props.row.id)"
               dense
               flat
               round
               icon="edit"
               :color="$q.dark.isActive ? 'accent' : 'base-dark-2'"
-              @click="openEdit(props.row)"
+              @click="emit('edit', props.row)"
             >
               <q-tooltip>Edit</q-tooltip>
             </q-btn>
 
-            <q-btn dense flat round icon="delete" color="negative" @click="deleteJob(props.row)">
+            <q-btn
+              dense
+              flat
+              round
+              icon="delete"
+              color="negative"
+              @click="emit('delete', props.row)"
+            >
               <q-tooltip>Delete</q-tooltip>
             </q-btn>
           </div>
@@ -122,21 +177,12 @@
       </template>
     </q-table>
   </q-card>
-  <ScheduleDialog v-model="dialog" :data="selectedSchedule" @submit="saveSchedule" />
 </template>
 
 <script setup lang="ts">
-import {
-  createSchedule,
-  deleteSchedule,
-  getSchedules,
-  updateSchedule,
-} from 'src/services/schedule.service';
 import type { QTableColumn } from 'quasar';
 import { useQuasar } from 'quasar';
-import { onMounted, ref } from 'vue';
-import ScheduleDialog from './ScheduleDialog.vue';
-import type { BackendSchedule, SchedulePayload } from 'src/types/Schedule';
+import type { PropType } from 'vue';
 import { DAY_LABELS } from 'src/constants/days';
 import { formatTime12h } from 'src/utils/formatters';
 import { useCopyStore } from 'stores/copy.store';
@@ -157,8 +203,23 @@ interface JobRow {
   status: 'Active' | 'In-active';
 }
 const $q = useQuasar();
-const dialog = ref(false);
-const selectedSchedule = ref<SchedulePayload | null>(null);
+const store = useCopyStore();
+
+const props = defineProps({
+  rows: {
+    type: Array as PropType<JobRow[]>,
+    default: () => [],
+  },
+});
+
+const emit = defineEmits<{
+  (e: 'edit', row: JobRow): void;
+  (e: 'delete', row: JobRow): void;
+  (e: 'run', row: JobRow): void;
+  (e: 'pause', row: JobRow): void;
+  (e: 'resume', row: JobRow): void;
+  (e: 'stop', row: JobRow): void;
+}>();
 
 const columns: QTableColumn<JobRow>[] = [
   { name: 'name', label: 'Name', field: 'name', align: 'left', sortable: true },
@@ -239,33 +300,6 @@ const columns: QTableColumn<JobRow>[] = [
   },
 ];
 
-const rows = ref<JobRow[]>([]);
-const formError = ref('');
-
-async function fetchSchedules() {
-  try {
-    const data: BackendSchedule[] = await getSchedules();
-
-    rows.value = data.map((s) => ({
-      id: s.id,
-      name: s.sched_name,
-      from: s.src_path,
-      to: s.dest_path,
-      recycle_path: s.recycle_path ?? '',
-      sched: s.days ?? [],
-      last_archived: s.last_archived ?? '',
-      last_sync: s.last_sync ?? '',
-      engine: s.engine,
-      type: s.type,
-      recycle: s.recycle,
-      status: s.active ? 'Active' : 'In-active',
-      time: s.time,
-    }));
-  } catch (err) {
-    console.error('Failed to fetch schedules', err);
-  }
-}
-
 function statusColor(status: JobRow['status']) {
   switch (status) {
     case 'Active':
@@ -277,129 +311,22 @@ function statusColor(status: JobRow['status']) {
   }
 }
 
-async function deleteJob(row: JobRow) {
-  if (row.id) {
-    await deleteSchedule(row.id);
-    await fetchSchedules();
-    return;
-  }
-  console.log('Delete job:', row);
-}
-
-function openCreate() {
-  selectedSchedule.value = null;
-  dialog.value = true;
-}
-
-function openEdit(row: JobRow) {
-  selectedSchedule.value = {
-    id: row.id,
-    name: row.name,
-    src_path: row.from,
-    dest_path: row.to,
-    engine: row.engine,
-    recycle_path: row.recycle_path,
-    sched: row.sched,
-    type: row.type,
-    time: row.time,
-    recycle: row.recycle,
-    status: row.status === 'Active' ? true : false,
-  };
-  dialog.value = true;
-  // console.log(selectedSchedule.value)
-}
-
-// After creating a schedule, refresh the table
-async function saveSchedule(payload: SchedulePayload) {
-  formError.value = '';
-
-  try {
-    if (payload.id) {
-      await updateSchedule({
-        id: payload.id,
-        sched_name: payload.name,
-        src_path: payload.src_path,
-        dest_path: payload.dest_path,
-        recycle_path: payload.recycle_path || '',
-        days: payload.sched.map(Number),
-        engine: payload.engine,
-        type: payload.type,
-        time: payload.time,
-        recycle: payload.recycle,
-        active: payload.status,
-      });
-
-      $q.notify({
-        type: 'success',
-        message: 'Schedule Updated !',
-      });
-      await fetchSchedules();
-      dialog.value = false;
-      return;
-    }
-
-    await createSchedule({
-      sched_name: payload.name,
-      src_path: payload.src_path,
-      dest_path: payload.dest_path,
-      recycle_path: payload.recycle_path || '',
-      days: payload.sched.map(Number),
-      engine: payload.engine,
-      type: payload.type,
-      time: payload.time,
-      recycle: payload.recycle,
-      active: true,
-    });
-
-    $q.notify({
-      type: 'success',
-      message: 'Schedule Created !',
-    });
-
-    await fetchSchedules();
-    dialog.value = false;
-    selectedSchedule.value = null;
-  } catch (err: unknown) {
-    console.log(err, 'err');
-    const message = err instanceof Error ? err.message : 'Failed to save schedule';
-
-    formError.value = message;
-
-    $q.notify({
-      type: 'negative',
-      message,
-    });
-
-    console.error('Failed to create/update schedule', err);
-    return false;
-  }
-}
-
 function shortenPath(path: string) {
   if (!path) return '—';
   return path.split(/[\\/]/).slice(-4).join('/');
 }
 
-const store = useCopyStore();
-
-async function runJob(row: JobRow) {
-  console.log("row ==>>",row)
-  await store.startCopy(
-    row.id,
-    row.name,
-    row.from,
-    row.to,
-    row.engine,
-    row.type,
-    row.recycle,
-    row.recycle_path,
-  );
-  // Refresh table
-  await fetchSchedules();
+function runJob(row: JobRow) {
+  emit('run', row);
 }
 
-// Fetch schedules when the table mounts
-onMounted(fetchSchedules);
+function isRowRunning(rowId: string) {
+  return store.jobs[rowId]?.status === 'running';
+}
+
+function isRowPaused(rowId: string) {
+  return store.jobs[rowId]?.status === 'paused';
+}
 </script>
 <style scoped>
 /* Card */

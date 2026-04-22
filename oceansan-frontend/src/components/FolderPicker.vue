@@ -5,6 +5,8 @@
     :readonly="hasNativePicker"
     :input-class="hasNativePicker ? 'cursor-pointer' : undefined"
     :label="label"
+    color="grey-8"
+    label-color="grey-10"
     :model-value="modelValue"
     @update:model-value="emit('update:modelValue', $event)"
     @click="handleClick"
@@ -14,12 +16,7 @@
     </template>
 
     <template v-if="hasNativePicker" #append>
-      <q-btn
-        flat
-        dense
-        icon="folder_open"
-        @click.stop="pickFolder"
-      />
+      <q-btn flat dense icon="folder_open" @click.stop="pickFolder" />
     </template>
   </q-input>
 </template>
@@ -32,7 +29,7 @@ defineProps<{
   modelValue: string | undefined;
 }>();
 
-const emit = defineEmits(["update:modelValue"]);
+const emit = defineEmits(['update:modelValue']);
 const hasNativePicker = computed(
   () => typeof window !== 'undefined' && typeof window.oceansan?.pickFolder === 'function',
 );
@@ -46,7 +43,7 @@ async function pickFolder() {
 
   const pickedPath = await oceansanApi.pickFolder();
   if (pickedPath) {
-    emit("update:modelValue", pickedPath);
+    emit('update:modelValue', pickedPath);
   }
 }
 

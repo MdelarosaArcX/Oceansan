@@ -4,7 +4,7 @@
     @update:model-value="emit('update:modelValue', $event)"
     persistent
   >
-    <q-card class="q-pa-none" style="width: 720px; max-width: 90vw">
+    <q-card class="q-pa-none" style="width: 820px; max-width: 90vw">
       <!-- Header -->
       <q-card-section class="row items-center justify-between q-pb-sm">
         <div>

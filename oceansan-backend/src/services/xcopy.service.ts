@@ -1,12 +1,15 @@
-import { spawn } from "child_process";
+import { ChildProcessWithoutNullStreams, spawn } from "child_process";
 import os from "os";
 import path from "path";
 import { CopyEngine } from "./copy.engine";
 import { normalizeWindowsPath } from "../utils/path.utils";
+import { killProcessTree, resumeProcess, suspendProcess } from "../utils/process-control";
 
 type Broadcaster = (data: unknown) => void;
 
 export default class XcopyService extends CopyEngine {
+  private proc: ChildProcessWithoutNullStreams | null = null;
+
   constructor(private ws?: Broadcaster) {
     super();
   }
@@ -49,10 +52,11 @@ export default class XcopyService extends CopyEngine {
 
   private run(args: string[]): Promise<void> {
     return new Promise((resolve, reject) => {
-      const proc = spawn("xcopy", args, {
+      this.proc = spawn("xcopy", args, {
         shell: false,
         windowsHide: true,
       });
+      const proc = this.proc;
 
       proc.stdout.on("data", (d) => {
         // console.log("[xcopy][stdout]", d.toString());
@@ -65,6 +69,7 @@ export default class XcopyService extends CopyEngine {
       });
 
       proc.on("close", (code) => {
+        this.proc = null;
         // console.log("[xcopy] exit code:", code);
 
         // XCOPY success: 0 or 1
@@ -76,5 +81,26 @@ export default class XcopyService extends CopyEngine {
         }
       });
     });
+  }
+
+  async pause(): Promise<void> {
+    if (!this.proc?.pid) {
+      throw new Error("Xcopy job is not running.");
+    }
+    await suspendProcess(this.proc.pid);
+  }
+
+  async resume(): Promise<void> {
+    if (!this.proc?.pid) {
+      throw new Error("Xcopy job is not running.");
+    }
+    await resumeProcess(this.proc.pid);
+  }
+
+  async stop(): Promise<void> {
+    if (!this.proc?.pid) {
+      throw new Error("Xcopy job is not running.");
+    }
+    await killProcessTree(this.proc.pid);
   }
 }
