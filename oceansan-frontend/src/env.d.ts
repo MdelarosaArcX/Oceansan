@@ -8,6 +8,8 @@ declare namespace NodeJS {
 
 interface Window {
   oceansan?: {
+    openDirectory: () => Promise<string | null>;
     pickFolder: () => Promise<string | null>;
+    openExternal: (url: string) => Promise<void>;
   };
 }

@@ -143,11 +143,18 @@ const menuList = [
     to: '/schedule',
   },
   {
+    icon: 'cloud_sync',
+    label: 'Backup / Sync',
+    separator: false,
+    to: '/backup/sync',
+  },
+  {
     icon: 'history_toggle_off',
     label: 'Logs',
     separator: false,
     to: '/logs',
   },
+  
 ];
 const route = useRoute();
 

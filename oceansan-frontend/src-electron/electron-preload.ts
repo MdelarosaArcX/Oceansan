@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, shell } from 'electron';
 
 /**
  * This file is used specifically for security reasons.
@@ -29,7 +29,10 @@ import { contextBridge, ipcRenderer } from 'electron';
  *   }
  * }
  */
+const openDirectory = () => ipcRenderer.invoke('dialog:openDirectory') as Promise<string | null>;
 
 contextBridge.exposeInMainWorld('oceansan', {
-  pickFolder: () => ipcRenderer.invoke('dialog:pick-folder') as Promise<string | null>,
+  openDirectory,
+  pickFolder: openDirectory,
+  openExternal: (url: string) => shell.openExternal(url),
 });

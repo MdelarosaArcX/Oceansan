@@ -9,7 +9,13 @@ import { WebSocketServer } from "ws";
 import scheduleRoutes from "./routes/schedule.routes";
 import scheduleLogsRoutes from "./routes/scheduleLogs.routes";
 import licenseRoutes from "./routes/license.routes";
+import backupRoutes from "./routes/backup.routes";
 import schedulerService from "./services/scheduler.service";
+import { executeBackupSync } from "./services/backup-runner.service";
+import {
+  backupAutoSyncService,
+  isBackupSyncDue,
+} from "./services/backup-schedule.service";
 // import Schedule from "./models/Schedule";
 import { CopyRunnerService } from "./services/copy-runner.service";
 import RamMonitorService from "./services/ram-monitor.service";
@@ -17,6 +23,7 @@ import { seedLicensesIfNeeded } from "./services/license-seed.service";
 // import ScheduleLogs from "./models/ScheduleLogs";
 // import { Types } from "mongoose";
 import { AppDataSource } from "./config/typeorm.config";
+import { BackupSettings } from "./entities/BackupSettings";
 import { ScheduleLogs } from "./entities/ScheduleLogs";
 // import { DeepPartial } from "typeorm";
 import "reflect-metadata";
@@ -29,6 +36,7 @@ AppDataSource.initialize()
 
     await seedLicensesIfNeeded();
     await resumeInterruptedJobs();
+    startBackupAutoSync();
 
     app.listen(PORT, () => {
       console.log(`API running on http://localhost:${PORT}`);
@@ -156,6 +164,36 @@ try {
   schedulerService.start(); //  REQUIRED
 } catch (error) {
   console.error("Scheduler failed to start:", error);
+}
+
+let backupAutoSyncRunning = false;
+
+function startBackupAutoSync() {
+  backupAutoSyncService.start(async () => {
+    if (backupAutoSyncRunning || !AppDataSource.isInitialized) {
+      return;
+    }
+
+    const settingsRepo = AppDataSource.getRepository(BackupSettings);
+    const settings = await settingsRepo.findOne({
+      where: { id: 1 },
+      order: { id: "ASC" },
+    });
+
+    if (!settings || !isBackupSyncDue(settings)) {
+      return;
+    }
+
+    backupAutoSyncRunning = true;
+
+    try {
+      await executeBackupSync("scheduled");
+    } catch (error) {
+      console.error("Scheduled backup sync failed:", error);
+    } finally {
+      backupAutoSyncRunning = false;
+    }
+  });
 }
 
 /* ---------------- REST APIs ---------------- */
@@ -304,5 +342,6 @@ process.on("unhandledRejection", (reason) => {
 app.use("/api/schedules", scheduleRoutes);
 app.use("/api/schedulesLogs", scheduleLogsRoutes);
 app.use("/license", licenseRoutes);
+app.use("/api/backup", backupRoutes);
 
 /* ---------------- Start Server ---------------- */
